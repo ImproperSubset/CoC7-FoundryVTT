@@ -11,6 +11,7 @@ import CoC7ModelsConfigureDocuments from '../setup/configure-documents.js'
 import CoC7ModelsRegisterSheets from '../setup/register-sheets.js'
 import CoC7RegisterDice from '../setup/register-dice.js'
 import CoC7RegisterSettings from '../setup/register-settings.js'
+import CoC7SanCheckCard from '../apps/san-check-card.js'
 import CoC7Utilities from '../apps/utilities.js'
 import CoCID from '../apps/coc-id.js'
 import CoCIDSkillCache from '../setup/coc-id-skill-cache.js'
@@ -53,6 +54,7 @@ export default function () {
     // Manual,
     messageResults: CoC7MessageResults.loadMessage,
     messagePermissionQueue: [],
+    sanCheck: CoC7SanCheckCard.create,
     ClickRegionLeftUuid: CoC7ClickableEvents.ClickRegionLeftUuid,
     ClickRegionRightUuid: CoC7ClickableEvents.ClickRegionRightUuid,
     hasPermissionDocument: CoC7ClickableEvents.hasPermissionDocument,
