@@ -1,0 +1,49 @@
+name: Fork release
+on:
+  release:
+    types:
+      - published
+permissions:
+  contents: write
+jobs:
+  release:
+    if: github.repository_owner == 'ImproperSubset'
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ github.event.release.tag_name }}
+    steps:
+      - uses: actions/checkout@v6
+      - name: Check the tag is the system version plus a fork build
+        # Tags look like 8.16.hh.1: the CoC7 release this fork is based on, then hh and a build number
+        run: |
+          base=$(jq -r .version static/system.json)
+          if ! [[ "$TAG" =~ ^${base//./\\.}\.hh\.[0-9]+$ ]]; then
+            echo "::error::release tag $TAG must be $base.hh.<build>"
+            exit 1
+          fi
+      - name: Use Node.js 24.x
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24.x
+      - run: npm install --no-audit --no-fund
+      - name: Build
+        run: |
+          jq -n --arg folder "$RUNNER_TEMP/foundry" '{release: $folder, currentSelection: "release"}' > fvtt.config.json
+          npm run compendiums-build
+          npm run manuals-build
+          npm run roll-requests-build
+          npm run build
+      - name: Package
+        env:
+          REPO: https://github.com/${{ github.repository }}
+        run: |
+          cd "$RUNNER_TEMP/foundry/Data/systems"
+          jq --arg version "$TAG" --arg url "$REPO" \
+            '.version = $version | .url = $url | .manifest = ($url + "/releases/latest/download/system.json") | .download = ($url + "/releases/download/" + $version + "/system.zip")' \
+            CoC7/system.json > "$RUNNER_TEMP/system.json"
+          cp "$RUNNER_TEMP/system.json" CoC7/system.json
+          zip -qr "$RUNNER_TEMP/system.zip" CoC7
+      - name: Upload
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$TAG" "$RUNNER_TEMP/system.json" "$RUNNER_TEMP/system.zip" --clobber
