@@ -1035,6 +1035,10 @@
   "CoC7.DholeHousePickYourJSONFile": "Pick the JSON file exported from The Dhole's House",
   "CoC7.DholeHouseActorImporterSource": "Imported from The Dhole's House Actor",
   "CoC7.DholeHouseInvalidActor": "The selected JSON doesn't seem to be a valid Dhole's House exported character",
+  "CoC7.CthulhumancerActorImporter": "Cthulhumancer Foundry export JSON",
+  "CoC7.CthulhumancerActorImporterSummary": "Export your Cthulhumancer investigator with its Foundry export and upload it here. Skills are matched against the skill compendiums.",
+  "CoC7.CthulhumancerPickYourJSONFile": "Pick the JSON file exported from Cthulhumancer",
+  "CoC7.CthulhumancerInvalidActor": "The selected JSON doesn't seem to be a Cthulhumancer Foundry export",
 
   "CoC7.Migrate.Title": "Update required",
   "CoC7.Migrate.Message": "<div>Your world requires an update to run version {version}.</div><div>Please backup your world folder before starting the upgrade.</div><div>If you do not update your world the system will not work correctly.</div><div>The world may be restarted when completed.</div>",

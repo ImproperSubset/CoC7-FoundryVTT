@@ -4,6 +4,8 @@
     {{#unless canUpload}}
       <div class="error">{{localize 'CoC7.UnableToUploadDholeImage'}}</div>
     {{/unless}}
+  {{else if (eq importType 'cthulhumancer')}}
+    <div>{{localize 'CoC7.CthulhumancerActorImporterSummary'}}</div>
   {{else}}
     <div>{{localize 'CoC7.ActorImporterSummary'}}</div>
   {{/if}}
@@ -39,6 +41,12 @@
     {{#if (and characterName characterImage)}}
       <div><strong>{{localize 'CoC7.DholeHouseImportingName'}}</strong> <span>{{characterName}}</span></div>
       <div><img id="dholehouse-character-portrait" src="{{characterImage}}" /></div>
+    {{/if}}
+  {{else if (eq importType 'cthulhumancer')}}
+    <label for="cthulhumancer-json-file-picker">{{localize 'CoC7.CthulhumancerPickYourJSONFile'}}</label>
+    <input id="cthulhumancer-json-file-picker" name="cthulhumancer-json-file-picker" type="file" accept="application/json" />
+    {{#if characterName}}
+      <div><strong>{{localize 'CoC7.DholeHouseImportingName'}}</strong> <span>{{characterName}}</span></div>
     {{/if}}
   {{else}}
     <div id="coc-prompt" data-text="{{localize 'CoC7.PasteTheDataBelow'}}">{{localize 'CoC7.PasteTheDataBelow'}}</div>

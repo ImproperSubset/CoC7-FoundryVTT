@@ -3,6 +3,7 @@ import { FOLDER_ID } from '../constants.js'
 import CoC7ActorImporter from './actor-importer.js'
 import CoC7ActorImporterRegExp from './actor-importer-regexp.js'
 import CoC7DholeHouseActorImporter from './dholehouse-importer.js'
+import CoC7CthulhumancerActorImporter from './cthulhumancer-importer.js'
 
 export default class CoC7ActorImporterDialog extends foundry.applications.api.HandlebarsApplicationMixin(foundry.applications.api.ApplicationV2) {
   /**
@@ -76,6 +77,11 @@ export default class CoC7ActorImporterDialog extends foundry.applications.api.Ha
               }
             }
             break
+          case 'cthulhumancer':
+            if (CoC7CthulhumancerActorImporter.isCthulhumancer(this.coc7Config.characterJSON)) {
+              context.characterName = this.coc7Config.characterJSON.name
+            }
+            break
         }
         context.importTypeOptions = [
           {
@@ -89,6 +95,10 @@ export default class CoC7ActorImporterDialog extends foundry.applications.api.Ha
           {
             key: 'dholehouse',
             label: 'CoC7.DholeHouseActorImporter'
+          },
+          {
+            key: 'cthulhumancer',
+            label: 'CoC7.CthulhumancerActorImporter'
           }
         ]
         context.convert6EOptions = [
@@ -167,6 +177,29 @@ export default class CoC7ActorImporterDialog extends foundry.applications.api.Ha
     this.element.querySelector('select[name=coc-entity-lang]')?.addEventListener('change', (event) => {
       this.coc7Config.language = event.currentTarget.value
       this.render({ force: true })
+    })
+    this.element.querySelector('input[name=cthulhumancer-json-file-picker]')?.addEventListener('change', (event) => {
+      const files = event.currentTarget.files
+      if (typeof files[0] !== 'undefined') {
+        const application = this
+        const fileReader = new FileReader()
+        fileReader.onload = function (e) {
+          try {
+            application.coc7Config.characterJSON = JSON.parse(fileReader.result)
+          } catch (e) {
+            application.coc7Config.characterJSON = {}
+            ui.notifications.error('CoC7.TextFieldInvalidJSON', { localize: true })
+            return
+          }
+          if (!CoC7CthulhumancerActorImporter.isCthulhumancer(application.coc7Config.characterJSON)) {
+            application.coc7Config.characterJSON = {}
+            ui.notifications.error('CoC7.CthulhumancerInvalidActor', { localize: true })
+            return
+          }
+          application.render({ force: true })
+        }
+        fileReader.readAsText(files[0])
+      }
     })
     this.element.querySelector('input[name=dholehouse-json-file-picker]')?.addEventListener('change', (event) => {
       const files = event.currentTarget.files
@@ -247,6 +280,24 @@ export default class CoC7ActorImporterDialog extends foundry.applications.api.Ha
             this.close()
           } else {
             form.style.display = ''
+          }
+        } else if (this.coc7Config.importType === 'cthulhumancer') {
+          if (CoC7CthulhumancerActorImporter.isCthulhumancer(this.coc7Config.characterJSON)) {
+            form.style.display = 'none'
+            const character = await CoC7CthulhumancerActorImporter.createActorFromCthulhumancer(this.coc7Config.characterJSON, { source: this.coc7Config.source })
+            if (character !== false) {
+              if (CONFIG.debug.CoC7Importer) {
+                console.debug('character:', character)
+              }
+              ui.notifications.info(game.i18n.format('CoC7.ActorImported', {
+                actorType: game.i18n.localize('TYPES.Actor.character'),
+                actorName: character.name
+              }), { console: false })
+              await character.sheet.render({ force: true })
+              this.close()
+            } else {
+              form.style.display = ''
+            }
           }
         } else if (this.coc7Config.characterData !== '') {
           this.close()
