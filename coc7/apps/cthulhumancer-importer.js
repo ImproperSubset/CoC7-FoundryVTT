@@ -154,6 +154,59 @@ export default class CoC7CthulhumancerActorImporter {
   }
 
   /**
+   * Rules for Pulp talents the system can apply, by lower case name
+   * @returns {object}
+   */
+  static get talentRules () {
+    return {
+      'quick healer': {
+        changes: [{ key: 'system.config.naturalHealing', value: 1 }]
+      },
+      endurance: {
+        changes: [{ key: 'system.characteristics.con.bonusDice', value: 1 }]
+      },
+      'beady eye': {
+        adjustments: [
+          { type: 'disableCombatPool', config: { disable: 'sizeSmall' } },
+          { type: 'disableCombatPool', config: { disable: 'inMelee' } }
+        ]
+      }
+    }
+  }
+
+  /**
+   * Add the talent's rule as an Active Effect or talent adjustments, unless the talent already has its own
+   * @param {object} talent
+   */
+  static applyTalentRule (talent) {
+    const rule = CoC7CthulhumancerActorImporter.talentRules[talent.name.toLocaleLowerCase()]
+    if (typeof rule === 'undefined') {
+      return
+    }
+    if (rule.changes && !(talent.effects ?? []).length) {
+      /* // FoundryVTT V13 */
+      if (game.release.generation < 14) {
+        talent.effects = [{
+          name: talent.name,
+          img: 'icons/svg/aura.svg',
+          changes: rule.changes.map(c => ({ key: c.key, mode: CONST.ACTIVE_EFFECT_MODES.ADD, value: c.value }))
+        }]
+      } else {
+        talent.effects = [{
+          name: talent.name,
+          img: 'icons/svg/aura.svg',
+          system: {
+            changes: rule.changes.map(c => ({ key: c.key, type: 'add', value: c.value }))
+          }
+        }]
+      }
+    }
+    if (rule.adjustments && !(talent.system?.adjustments ?? []).length) {
+      foundry.utils.setProperty(talent, 'system.adjustments', foundry.utils.duplicate(rule.adjustments))
+    }
+  }
+
+  /**
    * Replace non skill items with compendium matches by type and name, items without a match are kept as exported
    * @param {Array} cthulhumancerItems
    * @param {object} options
@@ -190,6 +243,9 @@ export default class CoC7CthulhumancerActorImporter {
       }
       if (typeof cloned.flags?.[FOLDER_ID]?.cocidFlag?.id !== 'string') {
         foundry.utils.setProperty(cloned, 'flags.' + FOLDER_ID + '.cocidFlag.id', 'i.' + item.type + '.' + CoC7Utilities.toKebabCase(item.name))
+      }
+      if (cloned.type === 'talent') {
+        CoC7CthulhumancerActorImporter.applyTalentRule(cloned)
       }
       items.push(cloned)
     }
