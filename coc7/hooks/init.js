@@ -1,4 +1,4 @@
-import { FOLDER_ID, ERAS, JOURNAL_STYLES } from '../constants.js'
+import { FOLDER_ID, ACTOR_IMPORTER_TYPES, ERAS, JOURNAL_STYLES } from '../constants.js'
 import CoC7ClickableEvents from '../apps/clickable-events.js'
 import CoC7Combat from '../apps/combat.js'
 import CoC7CompendiumFilter from '../setup/compendium-filter.js'
@@ -48,6 +48,14 @@ export default function () {
     },
     journalStyle: (value, label) => {
       JOURNAL_STYLES[value] = label
+    },
+    actorImporterType: (key, label, importer, summary = '', pick = label) => {
+      ACTOR_IMPORTER_TYPES[key] = {
+        label,
+        importer,
+        summary,
+        pick
+      }
     },
     createImportCharactersFolderIfNotExists: CoC7Utilities.createImportCharactersFolderIfNotExists,
     guessItems: CoC7Utilities.guessItems,

@@ -1,5 +1,5 @@
 // cSpell:words iwms wmis
-import { FOLDER_ID } from '../constants.js'
+import { FOLDER_ID, ACTOR_IMPORTER_TYPES } from '../constants.js'
 import CoC7ActorImporter from './actor-importer.js'
 import CoC7ActorImporterRegExp from './actor-importer-regexp.js'
 import CoC7DholeHouseActorImporter from './dholehouse-importer.js'
@@ -76,6 +76,14 @@ export default class CoC7ActorImporterDialog extends foundry.applications.api.Ha
               }
             }
             break
+          default:
+            if (typeof ACTOR_IMPORTER_TYPES[context.importType] !== 'undefined') {
+              context.importer = {
+                summary: ACTOR_IMPORTER_TYPES[context.importType].summary,
+                pick: ACTOR_IMPORTER_TYPES[context.importType].pick
+              }
+            }
+            break
         }
         context.importTypeOptions = [
           {
@@ -91,6 +99,12 @@ export default class CoC7ActorImporterDialog extends foundry.applications.api.Ha
             label: 'CoC7.DholeHouseActorImporter'
           }
         ]
+        for (const key in ACTOR_IMPORTER_TYPES) {
+          context.importTypeOptions.push({
+            key,
+            label: ACTOR_IMPORTER_TYPES[key].label
+          })
+        }
         context.convert6EOptions = [
           {
             key: 'coc-guess',
@@ -194,6 +208,22 @@ export default class CoC7ActorImporterDialog extends foundry.applications.api.Ha
         fileReader.readAsText(files[0])
       }
     })
+    this.element.querySelector('input[name=actor-importer-json-file-picker]')?.addEventListener('change', (event) => {
+      const files = event.currentTarget.files
+      if (typeof files[0] !== 'undefined') {
+        const application = this
+        const fileReader = new FileReader()
+        fileReader.onload = function (e) {
+          try {
+            application.coc7Config.characterJSON = JSON.parse(fileReader.result)
+          } catch (e) {
+            application.coc7Config.characterJSON = {}
+            ui.notifications.error('CoC7.TextFieldInvalidJSON', { localize: true })
+          }
+        }
+        fileReader.readAsText(files[0])
+      }
+    })
     const pastedData = this.element.querySelector('textarea[name=coc-pasted-character-data]')
     if (pastedData) {
       pastedData.addEventListener('keyup', (event) => {
@@ -241,6 +271,28 @@ export default class CoC7ActorImporterDialog extends foundry.applications.api.Ha
             /* // FoundryVTT V12 */
             ui.notifications.info(game.i18n.format('CoC7.ActorImported', {
               actorType: game.i18n.localize('TYPES.Actor.character'),
+              actorName: character.name
+            }), { console: false })
+            await character.sheet.render({ force: true })
+            this.close()
+          } else {
+            form.style.display = ''
+          }
+        } else if (typeof ACTOR_IMPORTER_TYPES[this.coc7Config.importType] !== 'undefined') {
+          form.style.display = 'none'
+          let character = false
+          try {
+            character = await ACTOR_IMPORTER_TYPES[this.coc7Config.importType].importer(this.coc7Config.characterJSON, { source: this.coc7Config.source })
+          } catch (e) {
+            console.error(e)
+          }
+          if (character instanceof Actor) {
+            if (CONFIG.debug.CoC7Importer) {
+              console.debug('character:', character)
+            }
+            /* // FoundryVTT V12 */
+            ui.notifications.info(game.i18n.format('CoC7.ActorImported', {
+              actorType: game.i18n.localize('TYPES.Actor.' + character.type),
               actorName: character.name
             }), { console: false })
             await character.sheet.render({ force: true })
