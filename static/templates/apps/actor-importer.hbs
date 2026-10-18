@@ -4,6 +4,10 @@
     {{#unless canUpload}}
       <div class="error">{{localize 'CoC7.UnableToUploadDholeImage'}}</div>
     {{/unless}}
+  {{else if importer}}
+    {{#if importer.summary}}
+      <div>{{localize importer.summary}}</div>
+    {{/if}}
   {{else}}
     <div>{{localize 'CoC7.ActorImporterSummary'}}</div>
   {{/if}}
@@ -40,6 +44,9 @@
       <div><strong>{{localize 'CoC7.DholeHouseImportingName'}}</strong> <span>{{characterName}}</span></div>
       <div><img id="dholehouse-character-portrait" src="{{characterImage}}" /></div>
     {{/if}}
+  {{else if importer}}
+    <label for="actor-importer-json-file-picker">{{localize importer.pick}}</label>
+    <input id="actor-importer-json-file-picker" name="actor-importer-json-file-picker" type="file" accept="application/json" />
   {{else}}
     <div id="coc-prompt" data-text="{{localize 'CoC7.PasteTheDataBelow'}}">{{localize 'CoC7.PasteTheDataBelow'}}</div>
     <div class="form-group">

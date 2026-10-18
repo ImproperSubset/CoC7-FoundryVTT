@@ -343,3 +343,5 @@ export const TALENT_ADJUSTMENT_TYPES = {
 }
 
 export const JOURNAL_STYLES = {}
+
+export const ACTOR_IMPORTER_TYPES = {}
