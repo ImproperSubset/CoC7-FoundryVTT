@@ -1,5 +1,6 @@
 // cSpell:words cthulhumancer
 import { FOLDER_ID } from '../constants.js'
+import CoC7DirectoryPicker from './directory-picker.js'
 import CoC7ModelsItemSkillSystem from '../models/item/skill-system.js'
 import CoC7Utilities from './utilities.js'
 import deprecated from '../deprecated.js'
@@ -430,6 +431,89 @@ export default class CoC7CthulhumancerActorImporter {
   }
 
   /**
+   * Name reduced to its lower case letters and digits, Tokenizer file names replace spaces and punctuation with underscores
+   * @param {string} name
+   * @returns {string}
+   */
+  static imageKey (name) {
+    return name.toLocaleLowerCase().replace(/[^\p{L}\p{N}]+/gu, '')
+  }
+
+  /**
+   * Folders that may hold Tokenizer images for a character, the Tokenizer module's own folder then each folder in tokenizer
+   * @returns {Array}
+   */
+  static async tokenizerFolders () {
+    const folders = []
+    if (game.modules.get('vtta-tokenizer')?.active) {
+      folders.push(CoC7DirectoryPicker.parse(game.settings.get('vtta-tokenizer', 'image-upload-directory')))
+    }
+    try {
+      const root = await (foundry.applications.apps?.FilePicker ?? FilePicker).browse('data', 'tokenizer')
+      for (const dir of root.dirs) {
+        folders.push({ activeSource: 'data', bucket: '', current: dir })
+      }
+    } catch (e) {
+      // No tokenizer folder, or the user cannot browse files
+    }
+    return folders.filter((f, i) => folders.findIndex(o => o.activeSource === f.activeSource && o.bucket === f.bucket && o.current === f.current) === i)
+  }
+
+  /**
+   * Find Tokenizer avatar and token images for a name, files are named Name.Avatar.webp or Avatar.Name.webp with an optional Actor ID after the name
+   * @param {string} name
+   * @returns {object}
+   */
+  static async findTokenizerImages (name) {
+    const key = CoC7CthulhumancerActorImporter.imageKey(name)
+    const images = {}
+    if (key === '') {
+      return images
+    }
+    for (const folder of await CoC7CthulhumancerActorImporter.tokenizerFolders()) {
+      let files = []
+      try {
+        files = (await (foundry.applications.apps?.FilePicker ?? FilePicker).browse(folder.activeSource, folder.current, folder.bucket ? { bucket: folder.bucket } : {})).files
+      } catch (e) {
+        continue
+      }
+      for (const file of files) {
+        const parts = decodeURIComponent(file.split('/').pop()).split('.').slice(0, -1)
+        const index = parts.findIndex(p => ['avatar', 'token'].includes(p.toLocaleLowerCase()))
+        if (index === -1) {
+          continue
+        }
+        const type = parts[index].toLocaleLowerCase()
+        const before = CoC7CthulhumancerActorImporter.imageKey(parts.slice(0, index).join('.'))
+        const after = CoC7CthulhumancerActorImporter.imageKey(parts.slice(index + 1).join('.'))
+        if (typeof images[type] === 'undefined' && (before === key || after === key)) {
+          images[type] = file
+        }
+      }
+    }
+    return images
+  }
+
+  /**
+   * Use Tokenizer images for the portrait and prototype token when the export has only the default image, setting the dynamic ring as the Tokenizer module would
+   * @param {object} actorData
+   */
+  static async applyTokenizerImages (actorData) {
+    const images = await CoC7CthulhumancerActorImporter.findTokenizerImages(actorData.name)
+    if (typeof images.avatar !== 'undefined' && [undefined, CONST.DEFAULT_TOKEN].includes(actorData.img)) {
+      actorData.img = images.avatar
+    }
+    if (typeof images.token !== 'undefined' && [undefined, CONST.DEFAULT_TOKEN].includes(actorData.prototypeToken?.texture?.src)) {
+      foundry.utils.setProperty(actorData, 'prototypeToken.texture.src', images.token)
+      foundry.utils.setProperty(actorData, 'prototypeToken.randomImg', false)
+      if (game.modules.get('vtta-tokenizer')?.active && game.settings.get('vtta-tokenizer', 'auto-apply-dynamic-token-ring') && !game.settings.get('vtta-tokenizer', 'force-disable-dynamic-token-ring')) {
+        foundry.utils.setProperty(actorData, 'prototypeToken.ring.enabled', true)
+        foundry.utils.setProperty(actorData, 'prototypeToken.ring.subject.texture', images.token)
+      }
+    }
+  }
+
+  /**
    * Convert Cthulhumancer JSON into Foundry Actor
    * @param {object} cthulhumancerData
    * @param {object} options
@@ -477,6 +561,7 @@ export default class CoC7CthulhumancerActorImporter {
     if (typeof cthulhumancerData.prototypeToken === 'object' && cthulhumancerData.prototypeToken !== null) {
       actorData.prototypeToken = cthulhumancerData.prototypeToken
     }
+    await CoC7CthulhumancerActorImporter.applyTokenizerImages(actorData)
     const actor = await Actor.create(actorData)
     if (actor) {
       await CoC7CthulhumancerActorImporter.linkWeaponSkills(actor)
