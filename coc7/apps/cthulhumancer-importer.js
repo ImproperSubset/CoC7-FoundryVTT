@@ -24,12 +24,23 @@ export default class CoC7CthulhumancerActorImporter {
   }
 
   /**
-   * Total of a skill's adjustments
+   * Add a duplicate skill's points and flags to the skill, keeping the higher base
    * @param {object} skill
-   * @returns {integer}
+   * @param {object} duplicate
    */
-  static skillTotal (skill) {
-    return Object.values(skill.system?.adjustments ?? {}).reduce((c, i) => c + (parseInt(i, 10) || 0), 0)
+  static mergeSkill (skill, duplicate) {
+    const adjustments = duplicate.system?.adjustments ?? {}
+    for (const key in adjustments) {
+      const current = parseInt(skill.system?.adjustments?.[key], 10) || 0
+      const added = parseInt(adjustments[key], 10) || 0
+      foundry.utils.setProperty(skill, 'system.adjustments.' + key, key === 'base' ? Math.max(current, added) : current + added)
+    }
+    const flags = duplicate.system?.flags ?? {}
+    for (const key in flags) {
+      if (flags[key]) {
+        foundry.utils.setProperty(skill, 'system.flags.' + key, true)
+      }
+    }
   }
 
   /**
@@ -67,23 +78,26 @@ export default class CoC7CthulhumancerActorImporter {
   }
 
   /**
-   * Remove duplicate skills, keeping the highest value, generic skills with no points spent that also have a specialization, and specializations with no points spent that are not on every investigator sheet
+   * Merge duplicate skills, Cthulhumancer can spend points on several skills of the same name, and remove generic skills with no points spent that also have a specialization, and specializations with no points spent that are neither on every investigator sheet nor added by the player
    * @param {Array} cthulhumancerSkills
    * @param {integer} [edu]
+   * @param {Array} [customNames] Lower case names of skills the player added
    * @returns {Array}
    */
-  static filterSkills (cthulhumancerSkills, edu) {
+  static filterSkills (cthulhumancerSkills, edu, customNames = []) {
     const byName = {}
     for (const skill of cthulhumancerSkills) {
       const name = CoC7CthulhumancerActorImporter.makeSkillName(skill.name)
       const key = name.toLocaleLowerCase()
-      if (typeof byName[key] === 'undefined' || CoC7CthulhumancerActorImporter.skillTotal(skill) > CoC7CthulhumancerActorImporter.skillTotal(byName[key].skill)) {
-        byName[key] = { name, skill }
+      if (typeof byName[key] === 'undefined') {
+        byName[key] = { name, skill: foundry.utils.duplicate(skill) }
+      } else {
+        CoC7CthulhumancerActorImporter.mergeSkill(byName[key].skill, skill)
       }
     }
     const keys = Object.keys(byName)
     return Object.entries(byName).filter(([key, entry]) => {
-      if (!CoC7CthulhumancerActorImporter.isAtDefault(entry.skill)) {
+      if (!CoC7CthulhumancerActorImporter.isAtDefault(entry.skill) || customNames.includes(key)) {
         return true
       }
       if (key.indexOf('(') > -1) {
@@ -99,11 +113,12 @@ export default class CoC7CthulhumancerActorImporter {
    * @param {object} options
    * @param {string} options.source
    * @param {integer} [options.edu]
+   * @param {Array} [options.customNames]
    * @param {object} progressBar
    * @returns {Array}
    */
   static async extractSkills (cthulhumancerSkills, options, progressBar) {
-    const lookFor = CoC7CthulhumancerActorImporter.filterSkills(cthulhumancerSkills, options.edu)
+    const lookFor = CoC7CthulhumancerActorImporter.filterSkills(cthulhumancerSkills, options.edu, options.customNames)
     const foundItems = await CoC7Utilities.guessItems('skill', lookFor.map(i => i.name), { source: options.source, fallbackAny: true })
     const skills = []
     for (const entry of lookFor) {
@@ -253,6 +268,19 @@ export default class CoC7CthulhumancerActorImporter {
   }
 
   /**
+   * Lower case system names of skills the player added in Cthulhumancer
+   * @param {object} cthulhumancerData
+   * @returns {Array}
+   */
+  static customSkillNames (cthulhumancerData) {
+    const customSkills = cthulhumancerData._cthulhumancer?.state?.customSkills
+    if (!Array.isArray(customSkills)) {
+      return []
+    }
+    return customSkills.filter(s => typeof s?.name === 'string').map(s => CoC7CthulhumancerActorImporter.makeSkillName(s.name).toLocaleLowerCase())
+  }
+
+  /**
    * Gear names from Cthulhumancer's own data, the Foundry export does not include them as Items
    * @param {object} cthulhumancerData
    * @returns {Array}
@@ -274,7 +302,16 @@ export default class CoC7CthulhumancerActorImporter {
    * @returns {string}
    */
   static wordKey (name) {
-    return name.toLocaleLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim().split(' ').sort().join(' ')
+    return CoC7CthulhumancerActorImporter.words(name).sort().join(' ')
+  }
+
+  /**
+   * Lower case words of a name
+   * @param {string} name
+   * @returns {Array}
+   */
+  static words (name) {
+    return name.toLocaleLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim().split(' ')
   }
 
   /**
@@ -298,7 +335,7 @@ export default class CoC7CthulhumancerActorImporter {
   }
 
   /**
-   * Create weapon and item objects for gear names, matching weapons then items, retrying without a trailing (model) part and then by the same words in any order
+   * Create weapon and item objects for gear names, matching weapons then items, retrying without a trailing (model) part, then by the same words in any order, then by the only weapon whose name contains all the words
    * @param {Array} names
    * @param {object} options
    * @param {string} options.source
@@ -320,11 +357,23 @@ export default class CoC7CthulhumancerActorImporter {
     const unmatched = names.filter(name => !lookup[name].some(n => typeof foundWeapons[n] !== 'undefined' || typeof foundItems[n] !== 'undefined'))
     if (unmatched.length) {
       const known = await CoC7CthulhumancerActorImporter.knownNames(['weapon', 'item'])
+      const knownWeapons = await CoC7CthulhumancerActorImporter.knownNames(['weapon'])
       for (const name of unmatched) {
-        for (const n of [...lookup[name]]) {
+        const tried = [...lookup[name]]
+        for (const n of tried) {
           const sameWords = known.find(k => CoC7CthulhumancerActorImporter.wordKey(k) === CoC7CthulhumancerActorImporter.wordKey(n))
           if (typeof sameWords !== 'undefined' && !lookup[name].includes(sameWords)) {
             lookup[name].push(sameWords)
+          }
+        }
+        if (lookup[name].length === tried.length) {
+          for (const n of tried) {
+            const words = CoC7CthulhumancerActorImporter.words(n)
+            // A short name such as Knife fits several weapons, so only a single fit is used
+            const containing = knownWeapons.filter(k => words.every(w => CoC7CthulhumancerActorImporter.words(k).includes(w)))
+            if (containing.length === 1 && !lookup[name].includes(containing[0])) {
+              lookup[name].push(containing[0])
+            }
           }
         }
       }
@@ -406,7 +455,7 @@ export default class CoC7CthulhumancerActorImporter {
       progressBar.bar = deprecated.displayProgressBar(game.i18n.localize('CoC7.CoCIDFlag.loading'))
     }
     const edu = parseInt(cthulhumancerData.system?.characteristics?.edu?.value, 10)
-    const skills = await CoC7CthulhumancerActorImporter.extractSkills(sourceSkills, { source: options.source, edu: isNaN(edu) ? undefined : edu }, progressBar)
+    const skills = await CoC7CthulhumancerActorImporter.extractSkills(sourceSkills, { source: options.source, edu: isNaN(edu) ? undefined : edu, customNames: CoC7CthulhumancerActorImporter.customSkillNames(cthulhumancerData) }, progressBar)
     const items = await CoC7CthulhumancerActorImporter.extractItems(otherItems, options, progressBar)
     const gear = await CoC7CthulhumancerActorImporter.extractGear(gearNames, options, progressBar)
     if (CONFIG.debug.CoC7Importer) {
