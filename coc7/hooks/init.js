@@ -50,6 +50,9 @@ export default function () {
     journalStyle: (value, label) => {
       JOURNAL_STYLES[value] = label
     },
+    createImportCharactersFolderIfNotExists: CoC7Utilities.createImportCharactersFolderIfNotExists,
+    guessItems: CoC7Utilities.guessItems,
+    toKebabCase: CoC7Utilities.toKebabCase,
     skillNames: new CoCIDSkillCache(),
     // Manual,
     messageResults: CoC7MessageResults.loadMessage,
