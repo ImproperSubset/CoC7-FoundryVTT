@@ -998,13 +998,17 @@ export default class CoC7ChatCombatRanged {
       let difficulty = CoC7DicePool.difficultyLevel.regular
       let poolModifier = data.targets[offset].poolModifier
       let damage = item?.system.range.normal.damage
-      if (!item?.system.properties.shotgun) {
-        if (data.targets[offset].longRange) {
-          difficulty = CoC7DicePool.difficultyLevel.hard
+      if (data.targets[offset].longRange) {
+        if (item?.system.properties.shotgun) {
           damage = item?.system.range.long.damage
-        } else if (data.targets[offset].extremeRange) {
-          difficulty = CoC7DicePool.difficultyLevel.extreme
+        } else {
+          difficulty = CoC7DicePool.difficultyLevel.hard
+        }
+      } else if (data.targets[offset].extremeRange) {
+        if (item?.system.properties.shotgun) {
           damage = item?.system.range.extreme.damage
+        } else {
+          difficulty = CoC7DicePool.difficultyLevel.extreme
         }
       }
       if (this.#aiming && this.#shots.length === 0) {

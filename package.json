@@ -5,11 +5,12 @@
   "scripts": {
     "build": "webpack --mode production",
     "compendiums-build": "node scripts/compendiums-build.js",
-    "eslint": "eslint coc7/ scripts/",
+    "eslint": "eslint coc7/ scripts/ test/",
     "game-icons-build": "node scripts/game-icons-build.js",
     "init": "node scripts/init.js",
     "manuals-build": "node scripts/manuals-build.js",
     "roll-requests-build": "node scripts/roll-requests-build.js",
+    "test": "node --test test/*.test.js",
     "translations-check": "node scripts/translations-check.js",
     "watch": "webpack --mode development"
   },
