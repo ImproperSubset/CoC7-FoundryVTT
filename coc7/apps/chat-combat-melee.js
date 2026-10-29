@@ -320,7 +320,11 @@ export default class CoC7ChatCombatMelee {
             }
           }
           buttons.sort(CoC7Utilities.sortByNameKey)
-          CoC7ChatDropdown.makeDropdown({ message, buttons, target: event.currentTarget, callback: CoC7ChatCombatMelee._onClickEvent })
+          if (buttons.length) {
+            CoC7ChatDropdown.makeDropdown({ message, buttons, target: event.currentTarget, callback: CoC7ChatCombatMelee._onClickEvent })
+          } else {
+            ui.notifications.warn('CoC7.Errors.NoFightBackWeapon', { localize: true })
+          }
         }
         break
       case 'setItem':
@@ -358,7 +362,11 @@ export default class CoC7ChatCombatMelee {
             }
           }
           buttons.sort(CoC7Utilities.sortByNameKey)
-          CoC7ChatDropdown.makeDropdown({ message, buttons, target: event.currentTarget, callback: CoC7ChatCombatMelee._onClickEvent })
+          if (buttons.length) {
+            CoC7ChatDropdown.makeDropdown({ message, buttons, target: event.currentTarget, callback: CoC7ChatCombatMelee._onClickEvent })
+          } else {
+            ui.notifications.warn('CoC7.Errors.NoManeuverSkill', { localize: true })
+          }
         }
         break
       case 'setNoResponse':

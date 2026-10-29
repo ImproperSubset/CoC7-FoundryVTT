@@ -1572,6 +1572,8 @@
   "CoC7.Errors.UnknownItem": "Unknown Item",
   "CoC7.Errors.UnknownSkill": "Unknown Skill",
   "CoC7.Errors.UnknownWeapon": "Unknown Weapon",
+  "CoC7.Errors.NoFightBackWeapon": "No melee weapon with a skill on this actor to fight back with",
+  "CoC7.Errors.NoManeuverSkill": "No Fighting skill on this actor to maneuver with",
   "CoC7.Errors.UnableToCalculateBaseValue": "Unable to calculate base value {base} for skill {name}",
   "CoC7.Errors.UnableToMigrateMessages": "Failed to migrate Chat Messages",
   "CoC7.PoolAddTwoBonus": "Add two bonus dice",
