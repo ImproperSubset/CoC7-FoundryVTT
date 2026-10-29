@@ -31,6 +31,20 @@
           {{else if isManeuver}}
             <span class="tag" data-tooltip="{{item.name}}">{{localize 'CoC7.Maneuver'}}</span>
           {{/if}}
+          {{#if poolBonus}}
+            {{#each poolBonus as |poolModifier|}}
+              {{#if poolModifier.selected}}
+                <span class="tag" data-tooltip="{{poolModifier.tooltip}}">{{poolModifier.name}}</span>
+              {{/if}}
+            {{/each}}
+          {{/if}}
+          {{#if poolPenalty}}
+            {{#each poolPenalty as |poolModifier|}}
+              {{#if poolModifier.selected}}
+                <span class="tag" data-tooltip="{{poolModifier.tooltip}}">{{poolModifier.name}}</span>
+              {{/if}}
+            {{/each}}
+          {{/if}}
         </div>
       {{/if}}
     </div>
@@ -64,6 +78,26 @@
         </div>
         <input type="range" name="poolModifier" min="-2" max="2" value="{{poolModifier}}" class="slider keeper-only-control">
       </div>
+    </div>
+  {{/if}}
+  {{#if (or poolBonus poolPenalty)}}
+    <div class="coc7-chat-content flexcol" data-actor-uuid="{{targetUuid}}">
+      {{#if poolBonus}}
+        <label>{{localize 'CoC7.BonusDice'}}</label>
+        <div class="coc7-card-buttons coc7-half-buttons flexrow">
+          {{#each poolBonus as |poolModifier|}}
+            <button class="keeper-only-control{{#if poolModifier.selected}} switched-on{{/if}}{{#if poolModifier.disabled}} talent-off{{/if}}" data-action="togglePoolKey" data-set="{{poolModifier.key}}" data-tooltip="{{poolModifier.tooltip}}">{{poolModifier.name}}</button>
+          {{/each}}
+        </div>
+      {{/if}}
+      {{#if poolPenalty}}
+        <label>{{localize 'CoC7.PenaltyDice'}}</label>
+        <div class="coc7-card-buttons coc7-half-buttons flexrow">
+          {{#each poolPenalty as |poolModifier|}}
+            <button class="keeper-only-control{{#if poolModifier.selected}} switched-on{{/if}}{{#if poolModifier.disabled}} talent-off{{/if}}" data-action="togglePoolKey" data-set="{{poolModifier.key}}" data-tooltip="{{poolModifier.tooltip}}">{{poolModifier.name}}</button>
+          {{/each}}
+        </div>
+      {{/if}}
     </div>
   {{/if}}
   <div class="owner-and-keeper-block coc7-card-buttons flexrow" data-actor-uuid="{{targetUuid}}">

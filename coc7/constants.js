@@ -274,6 +274,7 @@ export const DICE_POOL_REASONS = {
     forPenalty: false,
     forMelee: true,
     forRanged: false,
+    forResponse: true,
     name: 'CoC7.combatCard.ProneTarget',
     tooltip: 'CoC7.combatCard.ProneTargetTooltip'
   },

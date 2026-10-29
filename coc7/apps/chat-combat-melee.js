@@ -418,7 +418,7 @@ export default class CoC7ChatCombatMelee {
           const check = await CoC7ChatCombatMelee.loadFromMessage(message)
           const set = event.currentTarget?.dataset?.set
           if (check && set) {
-            if (DICE_POOL_REASONS[set]?.forMelee === true) {
+            if (DICE_POOL_REASONS[set]?.forMelee === true && (check.#participant !== CoC7ChatCombatMelee.participant.target || DICE_POOL_REASONS[set]?.forResponse === true)) {
               const index = check.#poolKeys.findIndex(k => k === set)
               if (index === -1) {
                 check.#poolKeys.push(set)
@@ -653,13 +653,21 @@ export default class CoC7ChatCombatMelee {
       targetUuid: CoC7Utilities.getActorUuid(target),
       template: ''
     }
+    const isResponse = (this.#participant === CoC7ChatCombatMelee.participant.target)
     const dicePoolReasons = CoC7Utilities.dicePoolReasons({ forMelee: true })
+    for (const key in dicePoolReasons) {
+      if (isResponse && (dicePoolReasons[key].forResponse !== true || (!data.isFightBack && !data.isManeuver))) {
+        delete dicePoolReasons[key]
+      }
+    }
+    const rollAttacker = (isResponse ? target : attacker)
+    const rollTarget = (isResponse ? attacker : target)
     const attackerKeys = Object.keys(dicePoolReasons).filter(k => dicePoolReasons[k].ifAttacker)
-    const attackerTalents = attacker?.items?.filter(doc => doc.type === 'talent' && doc.system.adjustments.find(row => row.type === 'disableCombatPool' && attackerKeys.includes(row.config.disable))) ?? []
+    const attackerTalents = rollAttacker?.items?.filter(doc => doc.type === 'talent' && doc.system.adjustments.find(row => row.type === 'disableCombatPool' && attackerKeys.includes(row.config.disable))) ?? []
     const attackerPoolDisabled = attackerTalents.filter(doc => doc.type === 'talent' && doc.system.adjustments.find(row => row.type === 'disableCombatPool')).reduce((c, doc) => { c = c.concat(doc.system.adjustments.filter(row => row.type === 'disableCombatPool' && attackerKeys.includes(row.config.disable)).map(doc => doc.config.disable)); return c }, [])
     data.attackerTalent = await Promise.all(attackerTalents.map(async (doc) => await (foundry.applications.ux?.TextEditor.implementation ?? TextEditor).enrichHTML(doc.link, { async: true }) ))
     const targetKeys = Object.keys(dicePoolReasons).filter(k => dicePoolReasons[k].ifDefender)
-    const targetTalents = target?.items?.filter(doc => doc.type === 'talent' && doc.system.adjustments.find(row => row.type === 'disableCombatPool' && targetKeys.includes(row.config.disable))) ?? []
+    const targetTalents = rollTarget?.items?.filter(doc => doc.type === 'talent' && doc.system.adjustments.find(row => row.type === 'disableCombatPool' && targetKeys.includes(row.config.disable))) ?? []
     const targetPoolDisabled = targetTalents.filter(doc => doc.type === 'talent' && doc.system.adjustments.find(row => row.type === 'disableCombatPool')).reduce((c, doc) => { c = c.concat(doc.system.adjustments.filter(row => row.type === 'disableCombatPool' && targetKeys.includes(row.config.disable)).map(doc => doc.config.disable)); return c }, [])
     data.targetTalent = await Promise.all(targetTalents.map(async (doc) => await (foundry.applications.ux?.TextEditor.implementation ?? TextEditor).enrichHTML(doc.link, { async: true }) ))
     for (const key in dicePoolReasons) {
@@ -824,19 +832,17 @@ export default class CoC7ChatCombatMelee {
   }
 
   /**
-   * Set pool keys from the conditions of the actor being attacked
+   * Set pool keys from the conditions of the actor being attacked, the target or for a response the attacker
    */
   async #setInitialPoolKeys () {
-    if (this.#participant === CoC7ChatCombatMelee.participant.initiator) {
-      const dicePoolReasons = CoC7Utilities.dicePoolReasons({ forMelee: true })
-      const target = (await this.target)
-      if (typeof dicePoolReasons.proneTarget !== 'undefined' && target?.hasConditionStatus('prone')) {
-        const targetKeys = Object.keys(dicePoolReasons).filter(k => dicePoolReasons[k].ifDefender)
-        const targetTalents = target?.items?.filter(doc => doc.type === 'talent' && doc.system.adjustments.find(row => row.type === 'disableCombatPool' && targetKeys.includes(row.config.disable))) ?? []
-        const targetPoolDisabled = targetTalents.filter(doc => doc.type === 'talent' && doc.system.adjustments.find(row => row.type === 'disableCombatPool')).reduce((c, doc) => { c = c.concat(doc.system.adjustments.filter(row => row.type === 'disableCombatPool' && targetKeys.includes(row.config.disable)).map(doc => doc.config.disable)); return c }, [])
-        if (!targetPoolDisabled.includes('proneTarget')) {
-          this.#poolKeys.push('proneTarget')
-        }
+    const dicePoolReasons = CoC7Utilities.dicePoolReasons({ forMelee: true })
+    const target = (this.#participant === CoC7ChatCombatMelee.participant.initiator ? (await this.target) : (await this.attacker))
+    if (typeof dicePoolReasons.proneTarget !== 'undefined' && target?.hasConditionStatus('prone')) {
+      const targetKeys = Object.keys(dicePoolReasons).filter(k => dicePoolReasons[k].ifDefender)
+      const targetTalents = target?.items?.filter(doc => doc.type === 'talent' && doc.system.adjustments.find(row => row.type === 'disableCombatPool' && targetKeys.includes(row.config.disable))) ?? []
+      const targetPoolDisabled = targetTalents.filter(doc => doc.type === 'talent' && doc.system.adjustments.find(row => row.type === 'disableCombatPool')).reduce((c, doc) => { c = c.concat(doc.system.adjustments.filter(row => row.type === 'disableCombatPool' && targetKeys.includes(row.config.disable)).map(doc => doc.config.disable)); return c }, [])
+      if (!targetPoolDisabled.includes('proneTarget')) {
+        this.#poolKeys.push('proneTarget')
       }
     }
   }

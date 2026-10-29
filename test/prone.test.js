@@ -3,6 +3,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import CoC7ChatCombatMelee from '../coc7/apps/chat-combat-melee.js'
 import CoC7ChatCombatRanged from '../coc7/apps/chat-combat-ranged.js'
+import CoC7DicePool from '../coc7/apps/dice-pool.js'
 import CoC7Utilities from '../coc7/apps/utilities.js'
 
 settings.ddtRuleShootingWithOffHand = false
@@ -58,6 +59,7 @@ function actor ({ prone = false, disable = [], token = false } = {}) {
     system: {
       attribs: {
         build: { value: 0 },
+        lck: { value: 50 },
         mov: { value: 8 }
       },
       characteristics: {
@@ -310,4 +312,119 @@ test('a melee card ticks nothing when the Prone rule is off', async (t) => {
 test('a talent that disables the Prone reason keeps it off the melee card', async (t) => {
   settings.pulpRuleProne = true
   assert.deepEqual(await meleePoolKeys({ prone: true, disable: ['proneTarget'] }, t), [])
+})
+
+/**
+ * Open a melee response card and return the dice pool keys it saves
+ * @param {object} options actor options for the attacker
+ * @param {object} t test context
+ * @returns {Array}
+ */
+async function responsePoolKeys (options, t) {
+  t.mock.method(CoC7ChatCombatMelee.prototype, 'getTemplateData', async () => ({}))
+  documents['Actor.attacker'] = actor(options)
+  documents['Actor.target'] = actor()
+  created = undefined
+  await CoC7ChatCombatMelee.createMessage({ attackerCheck: { message: { id: 'attackerMessage' } }, attackerUuid: 'Actor.attacker', targetUuid: 'Actor.target', participant: CoC7ChatCombatMelee.participant.target })
+  return created.flags.CoC7.load.poolKeys
+}
+
+test('a response card ticks the bonus when the attacker is prone', async (t) => {
+  settings.pulpRuleProne = true
+  assert.deepEqual(await responsePoolKeys({ prone: true }, t), ['proneTarget'])
+})
+
+test('a response card ticks nothing when the attacker is not prone', async (t) => {
+  settings.pulpRuleProne = true
+  assert.deepEqual(await responsePoolKeys({}, t), [])
+})
+
+test('a response card ticks nothing when the Prone rule is off', async (t) => {
+  settings.pulpRuleProne = false
+  assert.deepEqual(await responsePoolKeys({ prone: true }, t), [])
+})
+
+test('a talent on the prone attacker keeps the bonus off the response card', async (t) => {
+  settings.pulpRuleProne = true
+  assert.deepEqual(await responsePoolKeys({ prone: true, disable: ['proneTarget'] }, t), [])
+})
+
+/**
+ * Load a saved melee card and return what it shows and rolls with
+ * @param {object} options
+ * @param {integer} options.participant
+ * @param {string} options.response weapon, skill, dodge or none
+ * @param {Array} options.poolKeys
+ * @returns {object}
+ */
+async function meleeCard ({ participant, response, poolKeys }) {
+  documents['Actor.attacker'] = actor()
+  documents['Actor.target'] = actor()
+  documents['Item.response'] = {
+    type: (response === 'weapon' ? 'weapon' : 'skill'),
+    name: response,
+    img: 'response.webp',
+    uuid: 'Item.response',
+    system: {
+      description: { value: '' },
+      isDodge: response === 'dodge',
+      properties: { spcl: false },
+      skill: { main: { id: 'skill' }, alternativ: { id: '' } },
+      skillMain: undefined,
+      value: 50
+    }
+  }
+  const message = {
+    id: 'message',
+    flags: {
+      CoC7: {
+        load: {
+          as: 'CoC7ChatCombatMelee',
+          attackerUuid: 'Actor.attacker',
+          checkRevealed: true,
+          dicePool: CoC7DicePool.newPool({}).toObject(),
+          isAutoSuccess: false,
+          isNoResponse: response === 'none',
+          itemUuid: (response === 'none' ? '' : 'Item.response'),
+          participant,
+          poolKeys,
+          poolModifier: 0,
+          responded: false,
+          targetUuid: 'Actor.target'
+        }
+      }
+    }
+  }
+  const data = await (await CoC7ChatCombatMelee.loadFromMessage(message)).getTemplateData()
+  return {
+    finalPoolModifier: data.finalPoolModifier,
+    poolBonus: data.poolBonus.map(row => row.key).sort()
+  }
+}
+
+for (const [response, finalPoolModifier, poolBonus] of [
+  ['weapon', 1, ['proneTarget']],
+  ['skill', 1, ['proneTarget']],
+  ['dodge', 0, []],
+  ['none', 0, []]
+]) {
+  test('a response card with the attacker prone and a ' + response + ' response', async () => {
+    settings.pulpRuleProne = true
+    assert.deepEqual(await meleeCard({ participant: CoC7ChatCombatMelee.participant.target, response, poolKeys: ['proneTarget'] }), { finalPoolModifier, poolBonus })
+  })
+}
+
+test('a response card with no Prone bonus ticked fights back without bonus dice', async () => {
+  settings.pulpRuleProne = true
+  assert.deepEqual(await meleeCard({ participant: CoC7ChatCombatMelee.participant.target, response: 'weapon', poolKeys: [] }), { finalPoolModifier: 0, poolBonus: ['proneTarget'] })
+})
+
+test('a response card shows no Prone bonus when the rule is off', async () => {
+  settings.pulpRuleProne = false
+  assert.deepEqual(await meleeCard({ participant: CoC7ChatCombatMelee.participant.target, response: 'weapon', poolKeys: ['proneTarget'] }), { finalPoolModifier: 0, poolBonus: [] })
+})
+
+test('an attack card still shows every melee bonus and counts the Prone bonus', async () => {
+  settings.pulpRuleProne = true
+  assert.deepEqual(await meleeCard({ participant: CoC7ChatCombatMelee.participant.initiator, response: 'weapon', poolKeys: ['proneTarget'] }), { finalPoolModifier: 1, poolBonus: ['outnumbered', 'proneTarget', 'surprised'] })
 })

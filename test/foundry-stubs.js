@@ -73,6 +73,7 @@ globalThis.ActiveEffect = class {}
 globalThis.Actor = class {}
 globalThis.Item = class {}
 globalThis.Roll = class {}
+globalThis.TokenDocument = class {}
 globalThis.foundry = strict('foundry', {
   abstract: strict('foundry.abstract', {
     TypeDataModel: class {}
@@ -110,6 +111,11 @@ globalThis.foundry = strict('foundry', {
           enrichHTML: async value => value
         })
       })
+    })
+  }),
+  canvas: strict('foundry.canvas', {
+    placeables: strict('foundry.canvas.placeables', {
+      Token: class {}
     })
   }),
   data: strict('foundry.data', {
