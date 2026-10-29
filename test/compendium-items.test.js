@@ -29,3 +29,17 @@ test('the Mnvr weapon is a no-damage Brawl maneuver without damage bonus in Hand
   const skill = compendium('en-skills').find(doc => doc.type === 'skill' && doc.flags?.CoC7?.cocidFlag?.id === mnvr.system.skill.main.name)
   assert.equal(skill?.name, 'Fighting (Brawl)')
 })
+
+test('Hand-to-Hand Weapons has a copy of the Unarmed weapon', () => {
+  const unarmed = compendium('en-items').find(doc => doc._id === '3elxAwnv7WCUNwng') // cspell:disable-line
+  const weapons = compendium('en-wiki-weapons')
+  const copy = weapons.find(doc => doc.flags?.CoC7?.cocidFlag?.id === unarmed.flags.CoC7.cocidFlag.id)
+  assert.equal(weapons.find(doc => doc._id === copy.folder)?.name, 'Hand-to-Hand Weapons')
+  for (const key of ['name', 'type', 'img']) {
+    assert.equal(copy[key], unarmed[key])
+  }
+  assert.equal(copy.system.skill.main.name, unarmed.system.skill.main.name)
+  assert.equal(copy.system.range.normal.damage, unarmed.system.range.normal.damage)
+  assert.deepEqual(copy.system.properties, unarmed.system.properties)
+  assert.deepEqual(copy.flags, unarmed.flags)
+})

@@ -442,6 +442,27 @@ flags:
       lang: en
       priority: 0
 ---
+name: Unarmed
+type: weapon
+img: systems/CoC7/assets/icons/skills/fighting_brawl.svg
+folder: 2r5xD2GY15lSTtEm
+system:
+  skill:
+    main:
+      name: 'i.skill.fighting-brawl'
+  range:
+    normal:
+      damage: '1D3'
+  properties:
+    rngd: false
+    addb: true
+flags:
+  CoC7:
+    cocidFlag:
+      id: i.weapon.brawl
+      lang: en
+      priority: 0
+---
 name: .22 Short Automatic
 type: weapon
 img: icons/weapons/guns/gun-pistol-flintlock-metal.webp
