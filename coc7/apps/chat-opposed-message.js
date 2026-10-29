@@ -419,6 +419,7 @@ export default class CoC7ChatOpposedMessage {
         fullName: '-',
         isDodge: false,
         isManeuver: false,
+        isNoDamage: false,
         isPushable: false,
         key: match.groups.key,
         name: '-',
@@ -479,6 +480,7 @@ export default class CoC7ChatOpposedMessage {
       this.#actorRolls[actorUuid].shortName = '-'
       this.#actorRolls[actorUuid].isDodge = false
       this.#actorRolls[actorUuid].isManeuver = false
+      this.#actorRolls[actorUuid].isNoDamage = false
       this.#actorRolls[actorUuid].dicePool.threshold = 0
       this.#actorRolls[actorUuid].isPushable = false
       this.#actorRolls[actorUuid].skillUuid = false
@@ -531,6 +533,7 @@ export default class CoC7ChatOpposedMessage {
               this.#actorRolls[actorUuid].shortName = item.name
               this.#actorRolls[actorUuid].tags.push(this.#actorRolls[actorUuid].shortName)
               this.#actorRolls[actorUuid].isManeuver = (item.system.properties?.mnvr ?? false)
+              this.#actorRolls[actorUuid].isNoDamage = ((item.system.range?.normal?.damage ?? '') === '')
               const skillId = item.system.skill[item.system.usesAlternativeSkill ? 'alternativ' : 'main']?.id
               if (skillId) {
                 const skill = actor.items.find(d => d.id === skillId)
@@ -658,6 +661,7 @@ export default class CoC7ChatOpposedMessage {
         actorName: roll.name,
         isDodge: roll.isDodge,
         isManeuver: roll.isManeuver,
+        isNoDamage: roll.isNoDamage ?? false,
         isWinner: false,
         participant: roll.participant,
         rolls: [diceGroup],
@@ -705,7 +709,7 @@ export default class CoC7ChatOpposedMessage {
           checks[rollActors[actorUuid].participant].isManeuver = rollActors[actorUuid].isManeuver ?? false
           checks[rollActors[actorUuid].participant].actorName = rollActors[actorUuid].actorName
           checks[rollActors[actorUuid].participant].isWeapon = rollActors[actorUuid].type === 'item'
-          if (rollActors[actorUuid].isWinner && checks[rollActors[actorUuid].participant].isWeapon) {
+          if (rollActors[actorUuid].isWinner && checks[rollActors[actorUuid].participant].isWeapon && !(rollActors[actorUuid].isManeuver && rollActors[actorUuid].isNoDamage)) {
             data.winnerRollsDamage = true
           }
         }
@@ -771,10 +775,9 @@ export default class CoC7ChatOpposedMessage {
         }
         return 0
       })
-      const isManeuver = Object.values(rollActors).reduce((c, r) => c || r.isManeuver, false) || true
       for (const key of orderedKeys) {
         data.rollActors[key] = foundry.utils.duplicate(rollActors[key])
-        if (isManeuver) {
+        if (rollActors[key].isManeuver || (rollActors[key].type === CoC7Check.type.skill && !rollActors[key].isDodge)) {
           for (const roll of data.rollActors[key].rolls) {
             roll.tags.push(game.i18n.localize('CoC7.WeaponManeuver') + ' (' + game.i18n.localize('CoC7.Build') + ': ' + rollActors[key].build + ')')
           }
