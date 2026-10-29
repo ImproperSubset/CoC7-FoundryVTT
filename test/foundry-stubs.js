@@ -62,6 +62,11 @@ globalThis.game = strict('game', {
     }
   })
 })
+globalThis.Hooks = strict('Hooks', {
+  on: () => {},
+  once: () => {}
+})
+globalThis.ActiveEffect = class {}
 globalThis.Actor = class {}
 globalThis.Item = class {}
 globalThis.Roll = class {}
@@ -71,10 +76,30 @@ globalThis.foundry = strict('foundry', {
   }),
   applications: strict('foundry.applications', {
     api: strict('foundry.applications.api', {
-      ApplicationV2: class {},
+      ApplicationV2: class {
+        /**
+         * Foundry adds its own render context here, the tests need none of it
+         * @param {string} partId
+         * @param {object} context
+         * @returns {object}
+         */
+        async _preparePartContext (partId, context) {
+          return context
+        }
+      },
       DialogV2: class {},
       DocumentSheetV2: class {},
       HandlebarsApplicationMixin: base => class extends base {}
+    }),
+    apps: strict('foundry.applications.apps', {
+      FilePicker: class {}
+    }),
+    handlebars: strict('foundry.applications.handlebars', {
+      renderTemplate: async () => ''
+    }),
+    sheets: strict('foundry.applications.sheets', {
+      ActorSheetV2: class {},
+      ItemSheetV2: class {}
     }),
     ux: strict('foundry.applications.ux', {
       TextEditor: strict('foundry.applications.ux.TextEditor', {
@@ -84,7 +109,22 @@ globalThis.foundry = strict('foundry', {
       })
     })
   }),
+  data: strict('foundry.data', {
+    fields: strict('foundry.data.fields', {
+      StringField: class {}
+    }),
+    regionBehaviors: strict('foundry.data.regionBehaviors', {
+      RegionBehaviorType: class {}
+    })
+  }),
+  dice: strict('foundry.dice', {
+    terms: strict('foundry.dice.terms', {
+      Die: class {}
+    })
+  }),
   utils: strict('foundry.utils', {
-    duplicate: value => structuredClone(value)
+    duplicate: value => structuredClone(value),
+    // Foundry's merges nested objects too, no test passes any
+    mergeObject: (original, other) => Object.assign(original, other)
   })
 })
