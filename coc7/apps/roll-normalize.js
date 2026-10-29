@@ -223,7 +223,9 @@ export default class CoC7RollNormalize {
       ui.notifications.error(game.i18n.format('CoC7.ErrorInvalidFormula', { value: game.i18n.localize('CoC7.ErrorInvalidCardType') }))
       return false
     }
-    if (!config.askValue && typeof config.threshold === 'undefined' && ![CoC7RollNormalize.ROLL_TYPE.SKILL, CoC7RollNormalize.ROLL_TYPE.CHARACTERISTIC, CoC7RollNormalize.ROLL_TYPE.ATTRIBUTE, CoC7RollNormalize.ROLL_TYPE.ENCOUNTER].includes(config.rollType)) {
+    // Opposed and combined cards read a weapon's threshold from its skill
+    const isWeaponGroupRoll = (config.rollType === CoC7RollNormalize.ROLL_TYPE.WEAPON && [CoC7RollNormalize.CARD_TYPE.COMBINED, CoC7RollNormalize.CARD_TYPE.OPPOSED].includes(config.cardType))
+    if (!config.askValue && typeof config.threshold === 'undefined' && !isWeaponGroupRoll && ![CoC7RollNormalize.ROLL_TYPE.SKILL, CoC7RollNormalize.ROLL_TYPE.CHARACTERISTIC, CoC7RollNormalize.ROLL_TYPE.ATTRIBUTE, CoC7RollNormalize.ROLL_TYPE.ENCOUNTER].includes(config.rollType)) {
       /* // FoundryVTT V12 */
       ui.notifications.error(game.i18n.format('CoC7.ErrorInvalidFormula', { value: game.i18n.localize('CoC7.ErrorInvalidRollType') }))
       return false
