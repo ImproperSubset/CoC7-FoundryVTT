@@ -2,12 +2,14 @@ import { documents, settings } from './foundry-stubs.js'
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import CoC7ChatCombatMelee from '../coc7/apps/chat-combat-melee.js'
+import CoC7ChatDamage from '../coc7/apps/chat-damage.js'
 import CoC7DicePool from '../coc7/apps/dice-pool.js'
 import CoC7Utilities from '../coc7/apps/utilities.js'
 
 settings.displayActorOnCard = false
 settings.pulpRuleLuckMalfunction = false
 settings.pulpRuleProne = true
+settings.rollMode = 'publicroll' // cspell:disable-line
 game.user = { isGM: true }
 
 /**
@@ -188,4 +190,53 @@ test('an impossible maneuver is rolled at Impossible difficulty', async (t) => {
 test('an ordinary melee roll stays at Regular difficulty', async (t) => {
   assert.equal(await rolledDifficulty(CoC7ChatCombatMelee.participant.initiator, regular, t), regular)
   assert.equal(await rolledDifficulty(CoC7ChatCombatMelee.participant.target, undefined, t), regular)
+})
+
+/**
+ * Settle a melee exchange on the damage card and return its result
+ * @param {object} options
+ * @param {string} options.weapon damage formula of the attacker's Maneuver weapon, undefined for an ordinary weapon
+ * @param {object} options.response the defender's card data, undefined for no defender card
+ * @param {object} t test context
+ * @returns {object}
+ */
+async function damageCard ({ weapon, response }, t) {
+  documents['Actor.attacker'] = { ...actor(0), name: 'Attacker' }
+  documents['Actor.target'] = { ...actor(0), name: 'Defender' }
+  documents['Item.attack'] = { type: 'weapon', system: { properties: { mnvr: typeof weapon !== 'undefined' }, range: { normal: { damage: weapon ?? '1D3' } } } }
+  documents['Item.response'] = { type: 'weapon', system: { properties: { mnvr: false }, range: { normal: { damage: '1D3' } } } }
+  const cards = {
+    attacker: { attackerName: 'Attacker', attackerUuid: 'Actor.attacker', isSuccess: true, itemUuid: 'Item.attack', successLevel: CoC7DicePool.successLevel.hard, targetName: 'Defender', targetUuid: 'Actor.target' },
+    target: response
+  }
+  game.messages = { get: id => ({ flags: { CoC7: { load: { as: 'CoC7ChatCombatMelee' } } }, id }) }
+  t.mock.method(CoC7ChatCombatMelee, 'loadFromMessage', async (message) => ({ getTemplateData: async () => cards[message.id] }))
+  t.mock.method(CoC7ChatDamage.prototype, 'updateMessage', () => {})
+  t.mock.method(CoC7ChatDamage.prototype, 'getTemplateData', async () => ({}))
+  const check = new CoC7ChatDamage()
+  await check.updateFromCombatMelee({ attacker: 'attacker', target: (response ? 'target' : ''), targetUuid: 'Actor.target' })
+  const load = (await check.getChatData()).flags.CoC7.load
+  return { resultText: load.resultText, rollDamage: load.rollDamage }
+}
+
+const noResponse = { isNoResponse: true }
+const failedDodge = { isDodge: true, successLevel: CoC7DicePool.successLevel.failure, itemUuid: 'Item.response' }
+const fightBackWins = { isFightBack: true, successLevel: CoC7DicePool.successLevel.extreme, itemUuid: 'Item.response' }
+
+test('a winning Maneuver weapon with no damage reports the maneuver instead of damage', async (t) => {
+  for (const response of [undefined, noResponse, failedDodge]) {
+    assert.deepEqual(await damageCard({ weapon: '', response }, t), { resultText: 'CoC7.ManeuverSuccess', rollDamage: false })
+  }
+})
+
+test('a winning Maneuver weapon with damage still rolls damage', async (t) => {
+  assert.deepEqual(await damageCard({ weapon: '1D6', response: noResponse }, t), { resultText: 'CoC7.WinnerRollDamage', rollDamage: true })
+})
+
+test('a winning ordinary weapon still rolls damage', async (t) => {
+  assert.deepEqual(await damageCard({ response: noResponse }, t), { resultText: 'CoC7.WinnerRollDamage', rollDamage: true })
+})
+
+test('a defender who wins by fighting back still rolls damage against a Maneuver weapon', async (t) => {
+  assert.deepEqual(await damageCard({ weapon: '', response: fightBackWins }, t), { resultText: 'CoC7.WinnerRollDamage', rollDamage: true })
 })

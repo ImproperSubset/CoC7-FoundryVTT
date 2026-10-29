@@ -150,6 +150,17 @@ export default class CoC7ChatDamage {
         this.attacker = attackerData.attackerUuid
         this.item = attackerData.itemUuid
       }
+      if (this.#rollDamage) {
+        const item = (await this.item)
+        if (item?.type === 'weapon' && item.system.properties?.mnvr === true && (item.system.range?.normal?.damage ?? '') === '') {
+          const winner = (await this.attacker)
+          this.#resultText = game.i18n.format('CoC7.ManeuverSuccess', {
+            name: (winner ? (winner.isToken ? winner.token.name : winner.name) : '')
+          })
+          this.#rollDamage = false
+          checkCritical = false
+        }
+      }
       if (checkCritical && attackerData.successLevel >= CoC7DicePool.successLevel.extreme) {
         this.#isCritical = true
         const item = (await this.item)
