@@ -55,7 +55,7 @@
       {{#if item.system.properties.auto}}
         <button {{#if fullAuto}}class="switched-on"{{/if}}data-action="toggleValue" data-set="fullAuto"{{#if shotFired}} disabled="disabled"{{/if}}>{{localize 'CoC7.rangeCombatCard.FullAuto'}}</button>
       {{/if}}
-      <button class="keeper-only-control{{#if aiming}}{{#if (gt shotFired 0)}} coc7-disabled{{else}} switched-on{{/if}}{{/if}}" data-action="toggleValue" data-set="aiming"{{#if shotFired}} disabled="disabled"{{/if}} data-tooltip="CoC7.rangeCombatCard.AimingTitle">{{localize 'CoC7.rangeCombatCard.aiming'}}</button>
+      <button class="keeper-only-control{{#if aiming}}{{#if (gt shotFired 0)}} coc7-disabled{{else}} switched-on{{/if}}{{/if}}" data-action="toggleValue" data-set="aiming"{{#if shotFired}} disabled="disabled"{{/if}} data-tooltip="CoC7.rangeCombatCard.AimingTitle"><i class="fa-regular {{#if aiming}}fa-square-check{{else}}fa-square{{/if}}"></i> {{localize 'CoC7.rangeCombatCard.aiming'}}</button>
     </div>
   {{/if}}
 </div>
@@ -85,7 +85,7 @@
           <label>{{localize 'CoC7.BonusDice'}}</label>
           <div class="coc7-card-buttons coc7-half-buttons flexrow">
             {{#each ../poolBonus as |poolModifier|}}
-              <button class="keeper-only-control{{#if (contains poolModifier.key target.poolKeys)}} switched-on{{/if}}{{#if (contains poolModifier.key target.poolDisabled)}} talent-off{{/if}}" data-action="toggleTargetKey" data-set="{{poolModifier.key}}" data-tooltip="{{poolModifier.tooltip}}">{{poolModifier.name}}</button>
+              <button class="keeper-only-control{{#if (contains poolModifier.key target.poolKeys)}} switched-on{{/if}}{{#if (contains poolModifier.key target.poolDisabled)}} talent-off{{/if}}" data-action="toggleTargetKey" data-set="{{poolModifier.key}}" data-tooltip="{{poolModifier.tooltip}}"><i class="fa-regular {{#if (contains poolModifier.key target.poolKeys)}}fa-square-check{{else}}fa-square{{/if}}"></i> {{poolModifier.name}}</button>
             {{/each}}
           </div>
         {{/if}}
@@ -93,7 +93,7 @@
           <label>{{localize 'CoC7.PenaltyDice'}}</label>
           <div class="coc7-card-buttons coc7-half-buttons flexrow">
             {{#each ../poolPenalty as |poolModifier|}}
-              <button class="keeper-only-control{{#if (contains poolModifier.key target.poolKeys)}} switched-on{{/if}}{{#if (contains poolModifier.key target.poolDisabled)}} talent-off{{/if}}" data-action="toggleTargetKey" data-set="{{poolModifier.key}}" data-tooltip="{{poolModifier.tooltip}}">{{poolModifier.name}}</button>
+              <button class="keeper-only-control{{#if (contains poolModifier.key target.poolKeys)}} switched-on{{/if}}{{#if (contains poolModifier.key target.poolDisabled)}} talent-off{{/if}}" data-action="toggleTargetKey" data-set="{{poolModifier.key}}" data-tooltip="{{poolModifier.tooltip}}"><i class="fa-regular {{#if (contains poolModifier.key target.poolKeys)}}fa-square-check{{else}}fa-square{{/if}}"></i> {{poolModifier.name}}</button>
             {{/each}}
           </div>
         {{/if}}

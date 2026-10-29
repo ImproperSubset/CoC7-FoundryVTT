@@ -89,7 +89,7 @@
         <label>{{localize 'CoC7.BonusDice'}}</label>
         <div class="coc7-card-buttons coc7-half-buttons flexrow">
           {{#each poolBonus as |poolModifier|}}
-            <button class="keeper-only-control{{#if poolModifier.selected}} switched-on{{/if}}{{#if poolModifier.disabled}} talent-off{{/if}}" data-action="togglePoolKey" data-set="{{poolModifier.key}}" data-tooltip="{{poolModifier.tooltip}}">{{poolModifier.name}}</button>
+            <button class="keeper-only-control{{#if poolModifier.selected}} switched-on{{/if}}{{#if poolModifier.disabled}} talent-off{{/if}}" data-action="togglePoolKey" data-set="{{poolModifier.key}}" data-tooltip="{{poolModifier.tooltip}}"><i class="fa-regular {{#if poolModifier.selected}}fa-square-check{{else}}fa-square{{/if}}"></i> {{poolModifier.name}}</button>
           {{/each}}
         </div>
       {{/if}}
@@ -97,7 +97,7 @@
         <label>{{localize 'CoC7.PenaltyDice'}}</label>
         <div class="coc7-card-buttons coc7-half-buttons flexrow">
           {{#each poolPenalty as |poolModifier|}}
-            <button class="keeper-only-control{{#if poolModifier.selected}} switched-on{{/if}}{{#if poolModifier.disabled}} talent-off{{/if}}" data-action="togglePoolKey" data-set="{{poolModifier.key}}" data-tooltip="{{poolModifier.tooltip}}">{{poolModifier.name}}</button>
+            <button class="keeper-only-control{{#if poolModifier.selected}} switched-on{{/if}}{{#if poolModifier.disabled}} talent-off{{/if}}" data-action="togglePoolKey" data-set="{{poolModifier.key}}" data-tooltip="{{poolModifier.tooltip}}"><i class="fa-regular {{#if poolModifier.selected}}fa-square-check{{else}}fa-square{{/if}}"></i> {{poolModifier.name}}</button>
           {{/each}}
         </div>
       {{/if}}

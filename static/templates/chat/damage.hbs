@@ -61,9 +61,9 @@
   </div>
   {{#unless rollHtml}}
     <div class="keeper-only-block as-whisper-block coc7-card-buttons coc7-half-buttons flexrow">
-      <button class="keeper-only-control{{#if isCritical}} switched-on{{/if}}" data-action="toggleValue" data-set="isCritical" data-tooltip="CoC7.CriticalTitle">{{localize 'CoC7.Critical'}}</button>
+      <button class="keeper-only-control{{#if isCritical}} switched-on{{/if}}" data-action="toggleValue" data-set="isCritical" data-tooltip="CoC7.CriticalTitle"><i class="fa-regular {{#if isCritical}}fa-square-check{{else}}fa-square{{/if}}"></i> {{localize 'CoC7.Critical'}}</button>
       {{#if isCritical}}
-        <button class="keeper-only-control{{#if isImpale}} switched-on{{/if}}" data-action="toggleValue" data-set="isImpale" data-tooltip="CoC7.ImpaleTitle">{{localize 'CoC7.Impale'}}</button>
+        <button class="keeper-only-control{{#if isImpale}} switched-on{{/if}}" data-action="toggleValue" data-set="isImpale" data-tooltip="CoC7.ImpaleTitle"><i class="fa-regular {{#if isImpale}}fa-square-check{{else}}fa-square{{/if}}"></i> {{localize 'CoC7.Impale'}}</button>
       {{else}}
         <div class="coc7-button-area"></div>
       {{/if}}

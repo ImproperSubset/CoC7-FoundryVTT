@@ -66,14 +66,14 @@
     </div>
   {{/if}}
   <div class="keeper-only-block coc7-card-buttons flexrow">
-    <button class="{{#if isAutoSuccess}} switched-on{{/if}}" data-action="toggleValue" data-set="isAutoSuccess" data-tooltip="CoC7.TitleAutoSuccess">{{localize 'CoC7.combatCard.automaticSuccess'}}</button>
+    <button class="{{#if isAutoSuccess}} switched-on{{/if}}" data-action="toggleValue" data-set="isAutoSuccess" data-tooltip="CoC7.TitleAutoSuccess"><i class="fa-regular {{#if isAutoSuccess}}fa-square-check{{else}}fa-square{{/if}}"></i> {{localize 'CoC7.combatCard.automaticSuccess'}}</button>
   </div>
   <div class="coc7-chat-content flexcol" data-actor-uuid="{{attackerUuid}}">
     {{#if poolBonus}}
       <label>{{localize 'CoC7.BonusDice'}}</label>
       <div class="coc7-card-buttons coc7-half-buttons flexrow">
         {{#each poolBonus as |poolModifier|}}
-          <button class="keeper-only-control{{#if poolModifier.selected}} switched-on{{/if}}{{#if poolModifier.disabled}} talent-off{{/if}}" data-action="togglePoolKey" data-set="{{poolModifier.key}}" data-tooltip="{{poolModifier.tooltip}}">{{poolModifier.name}}</button>
+          <button class="keeper-only-control{{#if poolModifier.selected}} switched-on{{/if}}{{#if poolModifier.disabled}} talent-off{{/if}}" data-action="togglePoolKey" data-set="{{poolModifier.key}}" data-tooltip="{{poolModifier.tooltip}}"><i class="fa-regular {{#if poolModifier.selected}}fa-square-check{{else}}fa-square{{/if}}"></i> {{poolModifier.name}}</button>
         {{/each}}
       </div>
     {{/if}}
@@ -81,7 +81,7 @@
       <label>{{localize 'CoC7.PenaltyDice'}}</label>
       <div class="coc7-card-buttons coc7-half-buttons flexrow">
         {{#each poolPenalty as |poolModifier|}}
-          <button class="keeper-only-control{{#if poolModifier.selected}} switched-on{{/if}}{{#if poolModifier.disabled}} talent-off{{/if}}" data-action="togglePoolKey" data-set="{{poolModifier.key}}" data-tooltip="{{poolModifier.tooltip}}">{{poolModifier.name}}</button>
+          <button class="keeper-only-control{{#if poolModifier.selected}} switched-on{{/if}}{{#if poolModifier.disabled}} talent-off{{/if}}" data-action="togglePoolKey" data-set="{{poolModifier.key}}" data-tooltip="{{poolModifier.tooltip}}"><i class="fa-regular {{#if poolModifier.selected}}fa-square-check{{else}}fa-square{{/if}}"></i> {{poolModifier.name}}</button>
         {{/each}}
       </div>
     {{/if}}
