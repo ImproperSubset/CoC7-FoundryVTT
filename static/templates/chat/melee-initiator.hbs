@@ -45,6 +45,9 @@
               {{/if}}
             {{/each}}
           {{/if}}
+          {{#if buildTag}}
+            <span class="tag">{{buildTag}}</span>
+          {{/if}}
           {{#if isAutoSuccess}}
             <span class="tag" data-tooltip="CoC7.TitleAutoSuccess">{{localize 'CoC7.combatCard.automaticSuccess'}}</span>
           {{/if}}

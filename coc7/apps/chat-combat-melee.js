@@ -195,6 +195,9 @@ export default class CoC7ChatCombatMelee {
           const skill = attacker.items.get(event.target.dataset.skill)
           const threshold = skill?.system?.value
           if (threshold) {
+            if (message.flags[FOLDER_ID].load.difficulty === CoC7DicePool.difficultyLevel.impossible) {
+              check.#dicePool = CoC7DicePool.newPool({ difficulty: CoC7DicePool.difficultyLevel.impossible })
+            }
             check.#dicePool.poolModifier = message.flags[FOLDER_ID].load.finalPoolModifier
             check.#dicePool.threshold = threshold
             await check.#dicePool.roll()
@@ -404,6 +407,9 @@ export default class CoC7ChatCombatMelee {
               threshold = item?.system?.value
             }
             if (threshold) {
+              if (message.flags[FOLDER_ID].load.difficulty === CoC7DicePool.difficultyLevel.impossible) {
+                check.#dicePool = CoC7DicePool.newPool({ difficulty: CoC7DicePool.difficultyLevel.impossible })
+              }
               check.#dicePool.poolModifier = message.flags[FOLDER_ID].load.finalPoolModifier
               check.#dicePool.threshold = threshold
               await check.#dicePool.roll()
@@ -611,10 +617,12 @@ export default class CoC7ChatCombatMelee {
       badConsequence: !this.#noConsequence && (this.#dicePool.isMalfunction || this.#dicePool.isFumble),
       bonusDice: Math.abs(this.#dicePool.poolModifier),
       bonusType: game.i18n.localize(this.#dicePool.poolModifier < 0 ? 'CoC7.DiceModifierPenalty' : 'CoC7.DiceModifierBonus'),
+      buildTag: '',
       buttons: {},
       canLuckAwayConsequences: game.settings.get(FOLDER_ID, 'pulpRuleLuckMalfunction'),
       checkRevealed: this.#checkRevealed,
       diceGroup,
+      difficulty: CoC7DicePool.difficultyLevel.regular,
       displayActorOnCard: (attacker ? game.settings.get(FOLDER_ID, 'displayActorOnCard') : false),
       enrichedWeaponDescriptionSpecial: '',
       /* // FoundryVTT V12 */
@@ -710,6 +718,19 @@ export default class CoC7ChatCombatMelee {
     if (item?.system?.skill?.alternativ?.id) {
       data.skills.push(item?.system?.skillAlternative)
     }
+    if (((item?.type === 'weapon' && item.system.properties?.mnvr === true) || (isResponse && data.isManeuver)) && typeof rollAttacker?.system.attribs.build.value === 'number' && typeof rollTarget?.system.attribs.build.value === 'number') {
+      const buildDifference = rollAttacker.system.attribs.build.value - rollTarget.system.attribs.build.value
+      if (buildDifference <= -3) {
+        data.difficulty = CoC7DicePool.difficultyLevel.impossible
+        data.buildTag = game.i18n.localize('CoC7.ManeuverBuildImpossible')
+      } else if (buildDifference < 0) {
+        data.finalPoolModifier += buildDifference
+        data.buildTag = game.i18n.format('CoC7.ManeuverBuildPenalty', { build: buildDifference })
+      }
+      if (data.buildTag) {
+        data.tags.push(data.buildTag)
+      }
+    }
     data.finalPoolModifier = Math.max(-CoC7DicePool.maxDicePenalty, Math.min(CoC7DicePool.maxDiceBonus, data.finalPoolModifier))
     if (data.finalPoolModifier < 0) {
       data.tags.push(Math.abs(data.finalPoolModifier) + ' ' + game.i18n.localize('CoC7.DiceModifierPenalty'))
@@ -783,6 +804,7 @@ export default class CoC7ChatCombatMelee {
             cardOpen: true,
             checkRevealed: this.#checkRevealed,
             damageMessageId: this.#damageMessageId,
+            difficulty: data.difficulty,
             finalPoolModifier: data.finalPoolModifier,
             isAutoSuccess: this.#isAutoSuccess,
             isNoResponse: this.#isNoResponse,

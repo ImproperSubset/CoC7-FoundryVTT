@@ -295,6 +295,8 @@
   "CoC7.combatCard.SmallTarget": "Small target",
   "CoC7.combatCard.SmallTargetTooltip": "1 penalty die. Target is build -2 or smaller",
   "CoC7.combatCard.ProneTarget": "Prone target",
+  "CoC7.ManeuverBuildPenalty": "Maneuver (Build {build})",
+  "CoC7.ManeuverBuildImpossible": "Maneuver impossible (Build 3 or more below)",
   "CoC7.combatCard.ProneTargetTooltip": "1 bonus die. Target is prone",
   "CoC7.rangeCombatCard.ProneTarget": "Prone target",
   "CoC7.rangeCombatCard.ProneTargetTooltip": "1 penalty die. Target is prone and not at point blank range",

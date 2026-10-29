@@ -31,6 +31,9 @@
           {{else if isManeuver}}
             <span class="tag" data-tooltip="{{item.name}}">{{localize 'CoC7.Maneuver'}}</span>
           {{/if}}
+          {{#if buildTag}}
+            <span class="tag">{{buildTag}}</span>
+          {{/if}}
           {{#if poolBonus}}
             {{#each poolBonus as |poolModifier|}}
               {{#if poolModifier.selected}}
@@ -98,6 +101,11 @@
           {{/each}}
         </div>
       {{/if}}
+    </div>
+  {{/if}}
+  {{#if buildTag}}
+    <div class="coc7-tags">
+      <span class="tag">{{buildTag}}</span>
     </div>
   {{/if}}
   <div class="owner-and-keeper-block coc7-card-buttons flexrow" data-actor-uuid="{{targetUuid}}">
