@@ -310,6 +310,28 @@ flags:
       lang: en
       priority: 0
 ---
+name: Mnvr
+type: weapon
+img: systems/CoC7/assets/icons/skills/fighting_brawl.svg
+folder: 2r5xD2GY15lSTtEm
+system:
+  skill:
+    main:
+      name: 'i.skill.fighting-brawl'
+  range:
+    normal:
+      damage: ''
+  properties:
+    rngd: false
+    mnvr: true
+    addb: false
+flags:
+  CoC7:
+    cocidFlag:
+      id: i.weapon.mnvr
+      lang: en
+      priority: 0
+---
 name: Nunchaku
 type: weapon
 img: icons/weapons/staves/staff-mended.webp
