@@ -37,7 +37,8 @@ export default class CoC7ChatDropdown {
     if (!foundry.utils.isNewerVersion(game.version, 13)) {
       container = target.closest('.chat-sidebar')
     } else {
-      container = target.closest('.chat-scroll')
+      // Chat notifications have no chat scroll
+      container = target.closest('.chat-scroll') ?? target.closest('#chat-notifications')
       const ol = container.querySelector('.chat-log')
       if (ol.classList.contains('themed')) {
         dropdown.classList.add('themed')
@@ -51,7 +52,7 @@ export default class CoC7ChatDropdown {
     }
     container.append(dropdown)
     dropdown.style.width = (target.closest('.coc7-card-buttons').offsetWidth) + 'px'
-    dropdown.style.top = (target.offsetTop - dropdown.offsetHeight) + 'px'
+    dropdown.style.top = (target.getBoundingClientRect().top - container.getBoundingClientRect().top + container.scrollTop - dropdown.offsetHeight) + 'px'
     let onButton = true
     let onDropdown = false
     target.addEventListener('mouseleave', (event) => {
