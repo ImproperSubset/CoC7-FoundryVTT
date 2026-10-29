@@ -114,6 +114,7 @@ export default class CoC7Updater {
         game.settings.set(FOLDER_ID, 'pulpRuleLuckAvoidDeath', true)
         game.settings.set(FOLDER_ID, 'pulpRuleLuckSecondAttack', true)
         game.settings.set(FOLDER_ID, 'pulpRuleLuckLookOutMaster', true)
+        game.settings.set(FOLDER_ID, 'pulpRuleProne', true)
       }
       await CoC7Updater.migrateChatMessages()
     }

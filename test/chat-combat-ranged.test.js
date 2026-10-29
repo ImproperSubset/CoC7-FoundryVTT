@@ -8,6 +8,7 @@ settings.disregardAmmo = false
 settings.disregardUsePerRound = false
 settings.displayActorOnCard = false
 settings.pulpRuleLuckMalfunction = false
+settings.pulpRuleProne = false
 
 /**
  * Create a weapon with only the data the combat card reads
@@ -50,9 +51,10 @@ function weapon (shotgun) {
  * Load a combat card with one target and return that target's template data
  * @param {boolean} shotgun
  * @param {string} band normal, long or extreme
+ * @param {Array} poolKeys
  * @returns {object}
  */
-async function target (shotgun, band) {
+async function target (shotgun, band, poolKeys = []) {
   documents['Actor.attacker'] = undefined
   documents['Item.weapon'] = weapon(shotgun)
   const message = {
@@ -78,7 +80,7 @@ async function target (shotgun, band) {
             extremeRange: band === 'extreme',
             longRange: band === 'long',
             outOfRange: false,
-            poolKeys: [],
+            poolKeys,
             poolModifier: 0
           }],
           totalBulletsFired: 0,
@@ -93,7 +95,8 @@ async function target (shotgun, band) {
   const data = await card.getTemplateData()
   return {
     damage: data.targets[0].damage,
-    difficulty: data.targets[0].difficulty
+    difficulty: data.targets[0].difficulty,
+    finalPoolModifier: data.targets[0].finalPoolModifier
   }
 }
 
@@ -106,6 +109,20 @@ for (const [shotgun, band, damage, difficulty] of [
   [true, 'extreme', '1D3', 1]
 ]) {
   test((shotgun ? 'shotgun' : 'pistol') + ' at ' + band + ' range', async () => {
-    assert.deepEqual(await target(shotgun, band), { damage, difficulty })
+    assert.deepEqual(await target(shotgun, band), { damage, difficulty, finalPoolModifier: 0 })
+  })
+}
+
+for (const [poolKeys, finalPoolModifier, difficulty] of [
+  [['proneTargetRanged'], -1, 1],
+  [['proneShooter'], 1, 1],
+  [['proneShooter', 'proneTargetRanged'], 0, 1],
+  [['proneTargetRanged', 'sizeSmall'], -2, 1],
+  [['cover', 'proneTargetRanged', 'sizeSmall'], -2, 2]
+]) {
+  test('pistol at normal range with ' + poolKeys.join(', '), async () => {
+    settings.pulpRuleProne = true
+    assert.deepEqual(await target(false, 'normal', poolKeys), { damage: '1D10+2', difficulty, finalPoolModifier })
+    settings.pulpRuleProne = false
   })
 }

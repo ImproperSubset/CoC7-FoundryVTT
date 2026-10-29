@@ -265,6 +265,39 @@ export const DICE_POOL_REASONS = {
     forRanged: true,
     name: 'CoC7.rangeCombatCard.ReloadingFirearm',
     tooltip: 'CoC7.rangeCombatCard.ReloadingFirearmTooltip'
+  },
+  proneTarget: {
+    active: () => game.settings.get(FOLDER_ID, 'pulpRuleProne'),
+    ifAttacker: false,
+    ifDefender: true,
+    forBonus: true,
+    forPenalty: false,
+    forMelee: true,
+    forRanged: false,
+    name: 'CoC7.combatCard.ProneTarget',
+    tooltip: 'CoC7.combatCard.ProneTargetTooltip'
+  },
+  proneTargetRanged: {
+    active: () => game.settings.get(FOLDER_ID, 'pulpRuleProne'),
+    ifAttacker: false,
+    ifDefender: true,
+    forBonus: false,
+    forPenalty: true,
+    forMelee: false,
+    forRanged: true,
+    name: 'CoC7.rangeCombatCard.ProneTarget',
+    tooltip: 'CoC7.rangeCombatCard.ProneTargetTooltip'
+  },
+  proneShooter: {
+    active: () => game.settings.get(FOLDER_ID, 'pulpRuleProne'),
+    ifAttacker: true,
+    ifDefender: false,
+    forBonus: true,
+    forPenalty: false,
+    forMelee: false,
+    forRanged: true,
+    name: 'CoC7.rangeCombatCard.ProneShooter',
+    tooltip: 'CoC7.rangeCombatCard.ProneShooterTooltip'
   }
 }
 

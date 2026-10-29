@@ -85,6 +85,7 @@ export default class CoC7ChatCombatMelee {
       check.#participant = participant
       check.target = targetUuid
       await check.#setInitialPoolModifier(check.attacker)
+      await check.#setInitialPoolKeys()
       const chatData = await check.getChatData()
       const targetMessage = await ChatMessage.create(chatData)
       if (targetMessage && attackerCheck) {
@@ -820,6 +821,24 @@ export default class CoC7ChatCombatMelee {
       }
     }
     this.#poolModifier = Math.max(-CoC7DicePool.maxDicePenalty, Math.min(CoC7DicePool.maxDiceBonus, poolModifier))
+  }
+
+  /**
+   * Set pool keys from the conditions of the actor being attacked
+   */
+  async #setInitialPoolKeys () {
+    if (this.#participant === CoC7ChatCombatMelee.participant.initiator) {
+      const dicePoolReasons = CoC7Utilities.dicePoolReasons({ forMelee: true })
+      const target = (await this.target)
+      if (typeof dicePoolReasons.proneTarget !== 'undefined' && target?.hasConditionStatus('prone')) {
+        const targetKeys = Object.keys(dicePoolReasons).filter(k => dicePoolReasons[k].ifDefender)
+        const targetTalents = target?.items?.filter(doc => doc.type === 'talent' && doc.system.adjustments.find(row => row.type === 'disableCombatPool' && targetKeys.includes(row.config.disable))) ?? []
+        const targetPoolDisabled = targetTalents.filter(doc => doc.type === 'talent' && doc.system.adjustments.find(row => row.type === 'disableCombatPool')).reduce((c, doc) => { c = c.concat(doc.system.adjustments.filter(row => row.type === 'disableCombatPool' && targetKeys.includes(row.config.disable)).map(doc => doc.config.disable)); return c }, [])
+        if (!targetPoolDisabled.includes('proneTarget')) {
+          this.#poolKeys.push('proneTarget')
+        }
+      }
+    }
   }
 
   /**

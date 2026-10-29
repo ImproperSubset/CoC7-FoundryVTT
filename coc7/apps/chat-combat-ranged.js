@@ -111,6 +111,7 @@ export default class CoC7ChatCombatRanged {
           extremeRange: false,
           outOfRange: false,
           mov: 8,
+          proneTarget: false,
           size: CoC7ChatCombatRanged.TARGET_SIZE.normal,
           targetTalent: []
         }
@@ -118,6 +119,9 @@ export default class CoC7ChatCombatRanged {
         const attackerKeys = Object.keys(dicePoolReasons).filter(k => dicePoolReasons[k].ifAttacker)
         const attackerTalents = attacker?.items?.filter(doc => doc.type === 'talent' && doc.system.adjustments.find(row => row.type === 'disableCombatPool' && attackerKeys.includes(row.config.disable))) ?? []
         const attackerPoolDisabled = attackerTalents.filter(doc => doc.type === 'talent' && doc.system.adjustments.find(row => row.type === 'disableCombatPool')).reduce((c, doc) => { c = c.concat(doc.system.adjustments.filter(row => row.type === 'disableCombatPool' && attackerKeys.includes(row.config.disable)).map(doc => doc.config.disable)); return c }, [])
+        if (typeof dicePoolReasons.proneShooter !== 'undefined' && attacker.hasConditionStatus('prone') && !attackerPoolDisabled.includes('proneShooter')) {
+          targetSource.poolKeys.push('proneShooter')
+        }
         const targetKeys = Object.keys(dicePoolReasons).filter(k => dicePoolReasons[k].ifDefender)
         for (const targetUuid of targetUuids) {
           const target = await fromUuid(targetUuid)
@@ -142,6 +146,9 @@ export default class CoC7ChatCombatRanged {
                 targetData.poolKeys.push('sizeBig')
               }
             }
+            if (typeof dicePoolReasons.proneTargetRanged !== 'undefined' && target.hasConditionStatus('prone') && !attackerPoolDisabled.includes('proneTargetRanged') && !targetPoolDisabled.includes('proneTargetRanged')) {
+              targetData.proneTarget = true
+            }
             active = false
             const targetToken = target.getDependentTokens({ scene: canvas.scene }).find(doc => doc.object)
             if (targetToken && attackerToken) {
@@ -165,6 +172,9 @@ export default class CoC7ChatCombatRanged {
               }
             } else {
               distanceError = true
+            }
+            if (targetData.proneTarget && !targetData.poolKeys.includes('pointBlankRange')) {
+              targetData.poolKeys.push('proneTargetRanged')
             }
             check.#targets.push(targetData)
           }
@@ -605,6 +615,10 @@ export default class CoC7ChatCombatRanged {
                   const index = check.#targets[offset].poolKeys.findIndex(k => k === 'pointBlankRange')
                   if (index > -1) {
                     check.#targets[offset].poolKeys.splice(index, 1)
+                    if (check.#targets[offset].proneTarget === true && !check.#targets[offset].poolKeys.includes('proneTargetRanged')) {
+                      check.#targets[offset].poolKeys.push('proneTargetRanged')
+                      check.#targets[offset].poolKeys.sort()
+                    }
                   }
                   const oldActive = check.#targets.findIndex(t => t.active)
                   if (oldActive > -1) {
@@ -641,6 +655,10 @@ export default class CoC7ChatCombatRanged {
                   for (const key of keys) {
                     check.#targets[offset][key] = false
                   }
+                  const index = check.#targets[offset].poolKeys.findIndex(k => k === 'proneTargetRanged')
+                  if (index > -1) {
+                    check.#targets[offset].poolKeys.splice(index, 1)
+                  }
                 } else if (set === 'sizeBig') {
                   const index = check.#targets[offset].poolKeys.findIndex(k => k === 'sizeSmall')
                   if (index > -1) {
@@ -658,6 +676,10 @@ export default class CoC7ChatCombatRanged {
                 check.#targets[offset].poolKeys.splice(index, 1)
                 if (set === 'pointBlankRange') {
                   check.#targets[offset].baseRange = true
+                  if (check.#targets[offset].proneTarget === true && !check.#targets[offset].poolKeys.includes('proneTargetRanged')) {
+                    check.#targets[offset].poolKeys.push('proneTargetRanged')
+                    check.#targets[offset].poolKeys.sort()
+                  }
                 }
               }
               check.updateMessage()

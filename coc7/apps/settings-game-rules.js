@@ -165,6 +165,14 @@ const SETTINGS = {
     config: false,
     default: false,
     type: Boolean
+  },
+  pulpRuleProne: {
+    name: 'CoC7.Settings.PulpRules.Prone.Name',
+    hint: 'CoC7.Settings.PulpRules.Prone.Hint',
+    scope: 'world',
+    config: false,
+    default: false,
+    type: Boolean
   }
 }
 

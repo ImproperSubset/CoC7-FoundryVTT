@@ -29,6 +29,9 @@ export const documents = {}
  */
 export const settings = {}
 
+// Foundry adds this to Math
+Math.clamp = (value, min, max) => Math.min(Math.max(value, min), max)
+
 globalThis.CONFIG = strict('CONFIG', {
   ChatMessage: strict('CONFIG.ChatMessage', {
     modes: {
@@ -111,6 +114,7 @@ globalThis.foundry = strict('foundry', {
   }),
   data: strict('foundry.data', {
     fields: strict('foundry.data.fields', {
+      BooleanField: class {},
       StringField: class {}
     }),
     regionBehaviors: strict('foundry.data.regionBehaviors', {
