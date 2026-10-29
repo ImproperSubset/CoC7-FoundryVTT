@@ -171,7 +171,7 @@ export default class CoC7ChatCombinedMessage {
               }
               check.updateMessage()
             } else {
-              console.log('Attempting to add to a started roll')
+              CoC7ChatCombinedMessage.createGroupMessage(options)
             }
           }
         } else {

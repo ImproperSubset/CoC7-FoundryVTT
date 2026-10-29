@@ -127,7 +127,7 @@ export default class CoC7ChatOpposedMessage {
             }
             check.updateMessage()
           } else {
-            console.log('Attempting to add to a started roll')
+            CoC7ChatOpposedMessage.createGroupMessage(options)
           }
         }
       } else {
