@@ -98,3 +98,26 @@ language = "pygrep"
 entry = "<!--\\s*markdownlint-(disable|enable|capture|restore|configure-file)"
 types = ["markdown"]
 files = "^(diary/|PLAN\\.md$|CLAUDE\\.md$|\\.claude/rules/|\\.hh/docs/)"
+
+# The fork's own code checks: upstream's ESLint, as `npm run eslint` runs it,
+# held to no warnings, and the fork's tests, `npm test`. Each runs over the
+# whole project, so neither takes file names, and runs when a file it covers
+# is staged. They use the clone's own node_modules, from `npm install`.
+[[repos]]
+repo = "local"
+
+[[repos.hooks]]
+id = "eslint"
+name = "Upstream's ESLint"
+language = "system"
+entry = "npm run --silent eslint -- --max-warnings 0"
+files = "^(coc7|scripts|test)/.*\\.js$|^eslint\\.config\\.js$"
+pass_filenames = false
+
+[[repos.hooks]]
+id = "npm-test"
+name = "The fork's tests"
+language = "system"
+entry = "npm test --silent"
+files = "^(coc7|test)/|^package\\.json$"
+pass_filenames = false
