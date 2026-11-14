@@ -1,0 +1,23 @@
+[[set]]
+verdict = "kept"
+reason = "upstream's chat card markup with the fork's pool buttons and checkbox icons; removing the copy would change upstream's files and conflict at every merge"
+copies = [
+  { file = "static/templates/chat/melee-initiator.hbs", text = "sha256:a25ee8e666c5e9651c3cef17b72ff3d3666599efccae6ecf6f335c405710778d" },
+  { file = "static/templates/chat/melee-target.hbs", text = "sha256:8cdfe5250b2de0eada415b0640e0f0698b9ad111c2716c877662e36556da6c69" },
+]
+
+[[set]]
+verdict = "kept"
+reason = "upstream's chat card markup with the fork's pool buttons and checkbox icons; removing the copy would change upstream's files and conflict at every merge"
+copies = [
+  { file = "static/templates/chat/melee-initiator.hbs", text = "sha256:bb8437e8230352e39a2655e151cb84f26cd067e510e7de1fdebca529bc51f795" },
+  { file = "static/templates/chat/melee-target.hbs", text = "sha256:db11b57f81fd473c87c85eaa2ea08da86dd2b9830d3b2dc0e101d26d729a147d" },
+]
+
+[[set]]
+verdict = "kept"
+reason = "upstream's chat card markup with the fork's pool buttons and checkbox icons; removing the copy would change upstream's files and conflict at every merge"
+copies = [
+  { file = "static/templates/chat/range-initiator.hbs", text = "sha256:fc39483fdd8e3d134e10a62480c0d87b1022db0f524bf75bae27a8317f644c47" },
+  { file = "static/templates/chat/range-initiator.hbs", text = "sha256:cd9dd86119b1e8f29aae7c5d07be653a00e804a3c89659bcb13c0215efd23310" },
+]
