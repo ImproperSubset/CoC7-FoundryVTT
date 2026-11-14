@@ -34,10 +34,11 @@ globalThis.canvas = {
  * @param {object} options
  * @param {boolean} options.prone
  * @param {Array} options.disable dice pool keys a talent disables
+ * @param {Array} options.show talent adjustments that show a talent on combat cards
  * @param {boolean} options.token
  * @returns {object}
  */
-function actor ({ prone = false, disable = [], token = false } = {}) {
+function actor ({ prone = false, disable = [], show = [], token = false } = {}) {
   const items = disable.map(key => ({
     type: 'talent',
     system: {
@@ -48,7 +49,17 @@ function actor ({ prone = false, disable = [], token = false } = {}) {
         }
       }]
     }
-  }))
+  })).concat(show.map(type => ({
+    type: 'talent',
+    link: type,
+    effects: [],
+    system: {
+      adjustments: [{
+        type,
+        config: {}
+      }]
+    }
+  })))
   items.get = () => undefined
   return {
     type: 'character',
@@ -355,11 +366,13 @@ test('a talent on the prone attacker keeps the bonus off the response card', asy
  * @param {integer} options.participant
  * @param {string} options.response weapon, skill, dodge or none
  * @param {Array} options.poolKeys
+ * @param {object} options.attacker actor options for the attacker
+ * @param {object} options.target actor options for the target
  * @returns {object}
  */
-async function meleeCard ({ participant, response, poolKeys }) {
-  documents['Actor.attacker'] = actor()
-  documents['Actor.target'] = actor()
+async function meleeCardData ({ participant, response, poolKeys, attacker = {}, target = {} }) {
+  documents['Actor.attacker'] = actor(attacker)
+  documents['Actor.target'] = actor(target)
   documents['Item.response'] = {
     type: (response === 'weapon' ? 'weapon' : 'skill'),
     name: response,
@@ -395,7 +408,16 @@ async function meleeCard ({ participant, response, poolKeys }) {
       }
     }
   }
-  const data = await (await CoC7ChatCombatMelee.loadFromMessage(message)).getTemplateData()
+  return (await CoC7ChatCombatMelee.loadFromMessage(message)).getTemplateData()
+}
+
+/**
+ * Load a saved melee card and return what it shows and rolls with
+ * @param {object} options as meleeCardData
+ * @returns {object}
+ */
+async function meleeCard (options) {
+  const data = await meleeCardData(options)
   return {
     finalPoolModifier: data.finalPoolModifier,
     poolBonus: data.poolBonus.map(row => row.value).sort()
@@ -427,4 +449,27 @@ test('a response card shows no Prone bonus when the rule is off', async () => {
 test('an attack card still shows every melee bonus and counts the Prone bonus', async () => {
   settings.pulpRuleProne = true
   assert.deepEqual(await meleeCard({ participant: CoC7ChatCombatMelee.participant.initiator, response: 'weapon', poolKeys: ['proneTarget'] }), { finalPoolModifier: 1, poolBonus: ['outnumbered', 'proneTarget', 'surprised'] })
+})
+
+test('the Prone pool buttons on melee and ranged cards show their labels', async () => {
+  settings.pulpRuleProne = true
+  const data = await meleeCardData({ participant: CoC7ChatCombatMelee.participant.target, response: 'weapon', poolKeys: [] })
+  assert.deepEqual(data.poolBonus.map(row => [row.value, row.label]), [['proneTarget', 'CoC7.combatCard.ProneTarget']])
+  const reasons = CoC7Utilities.dicePoolReasons({ forRanged: true })
+  assert.equal(reasons.proneTargetRanged.label, 'CoC7.rangeCombatCard.ProneTarget')
+  assert.equal(reasons.proneShooter.label, 'CoC7.rangeCombatCard.ProneShooter')
+})
+
+test('a response card shows the responding defender\'s talents as the roller\'s, and the attacker\'s as the target\'s', async () => {
+  settings.pulpRuleProne = true
+  const data = await meleeCardData({ participant: CoC7ChatCombatMelee.participant.target, response: 'weapon', poolKeys: [], attacker: { show: ['showOnCombatDefender'] }, target: { show: ['showOnCombatAttacker'] } })
+  assert.deepEqual(data.attackerTalent, ['showOnCombatAttacker'])
+  assert.deepEqual(data.targetTalent, ['showOnCombatDefender'])
+})
+
+test('an attack card shows the attacker\'s and the target\'s talents', async () => {
+  settings.pulpRuleProne = true
+  const data = await meleeCardData({ participant: CoC7ChatCombatMelee.participant.initiator, response: 'weapon', poolKeys: [], attacker: { show: ['showOnCombatAttacker'] }, target: { show: ['showOnCombatDefender'] } })
+  assert.deepEqual(data.attackerTalent, ['showOnCombatAttacker'])
+  assert.deepEqual(data.targetTalent, ['showOnCombatDefender'])
 })
