@@ -1,5 +1,27 @@
 # Plan
 
+- **Wrap finding**: `PLAN.md` and `diary/2026-11-14.md` say, in this public
+  repository, how many Foundry instances run the system, which Foundry version
+  they run, and that one hosts a live campaign; no host, path or address is
+  named. Proposed: the operator decides whether such facts belong only in
+  `CLAUDE.local.md`; if so, the plan line is reworded, and the diary, being
+  append-only and pushed, stays.
+
+- **New duplication**: `static/templates/chat/melee-initiator.hbs:71-88` and
+  `static/templates/chat/melee-target.hbs:85-101`, a mainline exact set new
+  since 3b821288. Remove it with `/hh-dedupe`, or keep it with the operator's
+  agreement.
+
+- **New duplication**: `static/templates/chat/melee-initiator.hbs:32-48` and
+  `static/templates/chat/melee-target.hbs:33-48`, a mainline exact set new since
+  3b821288. Remove it with `/hh-dedupe`, or keep it with the operator's
+  agreement.
+
+- **New duplication**: `static/templates/chat/range-initiator.hbs:87-92` and
+  `static/templates/chat/range-initiator.hbs:95-100`, a mainline exact set new
+  since 3b821288. Remove it with `/hh-dedupe`, or keep it with the operator's
+  agreement.
+
 - **Try 9.2.hh.1 in a world**: install the `9.2.hh.1` release on an instance
   through Foundry's update, on the operator's go-ahead, since one instance hosts
   a live campaign. Both instances run Foundry 14 and install the system from the

@@ -102,7 +102,8 @@ files = "^(diary/|PLAN\\.md$|CLAUDE\\.md$|\\.claude/rules/|\\.hh/docs/)"
 # The fork's own code checks: upstream's ESLint, as `npm run eslint` runs it,
 # held to no warnings, and the fork's tests, `npm test`. Each runs over the
 # whole project, so neither takes file names, and runs when a file it covers
-# is staged. They use the clone's own node_modules, from `npm install`.
+# is staged. They use the clone's own node_modules, from `npm install` (diary
+# decision 2026-11-14: the fork's code checks in its commit hook).
 [[repos]]
 repo = "local"
 
