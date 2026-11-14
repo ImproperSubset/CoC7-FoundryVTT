@@ -1,13 +1,13 @@
 # Plan
 
-- **Release 9.2.hh.1**: push `hh-main` and release it as `9.2.hh.1`, as
-  `.hh/docs/releases.md` says, on the operator's go-ahead for the push and the
-  release. It needs Foundry VTT 13 or later on each instance before the instance
-  takes the update. Checked by the release workflow's run and the instance's
-  `system.json` showing `9.2.hh.1` and the fork's manifest; the combat cards
-  (melee and ranged pool buttons with their checkboxes, the Pulp Prone dice, the
-  Build tag, the response card's talents) are tried in a world, since no test
-  renders a template.
+- **Try 9.2.hh.1 in a world**: install the `9.2.hh.1` release on an instance
+  through Foundry's update, on the operator's go-ahead, since one instance hosts
+  a live campaign. Both instances run Foundry 14 and install the system from the
+  fork's manifest, so the release shows there as an update. Checked by the
+  instance's `system.json` showing `9.2.hh.1` and the fork's manifest, and by
+  trying the combat cards in a world (melee and ranged pool buttons with their
+  checkboxes, the Pulp Prone dice, the Build tag, the response card's talents),
+  since no test renders a template.
 
 - **Review the existing docs**: read the project's existing docs against the
   principles, as a whole set: `CLAUDE.md`, the project's own rules and the
