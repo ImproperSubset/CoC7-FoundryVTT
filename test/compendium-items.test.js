@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
-import yaml from 'js-yaml'
+import { loadAll } from 'js-yaml'
 
 /**
  * Read every document in a compendium source file
@@ -9,7 +9,7 @@ import yaml from 'js-yaml'
  * @returns {Array}
  */
 function compendium (name) {
-  return yaml.loadAll(fs.readFileSync(new URL('../compendiums/' + name + '.yaml', import.meta.url), 'utf8')).filter(doc => doc)
+  return loadAll(fs.readFileSync(new URL('../compendiums/' + name + '.yaml', import.meta.url), 'utf8')).filter(doc => doc)
 }
 
 test('the Unarmed weapon uses a skill that exists', () => {

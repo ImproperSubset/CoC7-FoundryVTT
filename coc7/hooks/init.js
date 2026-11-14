@@ -28,7 +28,7 @@ export default function () {
 
   document.body.classList.add('running-v' + game.release.generation.toString())
 
-  game.CoC7 = {
+  game[FOLDER_ID] = {
     macros: {
       skillCheck: CoC7Utilities.skillCheckMacro,
       weaponCheck: CoC7Utilities.weaponCheckMacro,
@@ -41,9 +41,9 @@ export default function () {
         alwaysFumble: false
       }
     },
-    eras: (era, name, icon = 'fa-solid fa-info-circle') => {
+    eras: (era, label, icon = 'fa-solid fa-info-circle') => {
       ERAS[era] = {
-        name,
+        label,
         icon
       }
     },
@@ -90,7 +90,36 @@ export default function () {
   CoC7ClickableEvents.initSelf()
 
   deprecated.CoCID()
-  deprecated.init()
+
+  /* // FoundryVTT V13 */
+  if (game.release.generation > 13) {
+    CONFIG.TextEditor.inserts.push(...[{
+      action: 'keeper-foundryvtt',
+      title: 'CoC7.ProseMirror.FoundryVTTNote',
+      inline: false,
+      html: '<div class="keeper-foundryvtt"><div class="keeper-title"><p></p></div><div class="keeper-body"><selection><p>Body</p></selection></div></div>'
+    }, {
+      action: 'keeper-read-aloud',
+      title: 'CoC7.ProseMirror.ReadAloud',
+      inline: false,
+      html: '<div class="keeper-read-aloud"><div class="keeper-title"><p></p></div><div class="keeper-body"><selection><p>Body</p></selection></div></div>'
+    }, {
+      action: 'keeper-notes',
+      title: 'CoC7.ProseMirror.KeeperNotes',
+      inline: false,
+      html: '<div class="keeper-notes"><div class="keeper-title"><p></p></div><div class="keeper-body"><selection><p>Body</p></selection></div></div>'
+    }, {
+      action: 'coc7-toggle-section',
+      title: 'CoC7.ProseMirror.ToggleSection',
+      inline: false,
+      html: '<section class="tmi-toggleable"><p class="toggle">Reveal</p><div class="toggle"><selection><p>Body</p></selection></div></section>'
+    }, {
+      action: 'coc7-quote',
+      title: 'CoC7.ProseMirror.Quote',
+      inline: false,
+      html: '<div><blockquote><selection><p>Body</p></selection></blockquote><p style="text-align: right;">—Author, <em>source</em></p></div>'
+    }])
+  }
 
   CONFIG.TextEditor.enrichers.push({
     pattern: /@chaosiumUUID\[([^#\]]+)(?:#([^\]]+))?](?:{([^}]+)})?/gi,
@@ -144,7 +173,7 @@ export default function () {
         }
       }
 
-      return (foundry.applications.ux?.TextEditor.implementation ?? TextEditor).createAnchor(data)
+      return foundry.applications.ux.TextEditor.implementation.createAnchor(data)
     }
   })
 
@@ -170,7 +199,6 @@ export default function () {
         a.prepend(i)
         return a
       }
-
 
       const context = {
         displayName: match[2] ?? actor.name,
@@ -204,8 +232,7 @@ export default function () {
       }
 
       if (['creature', 'npc'].includes(context.document.type)) {
-        /* // FoundryVTT V12 */
-        context.enrichedBiographyPersonalDescription = await (foundry.applications.ux?.TextEditor.implementation ?? TextEditor).enrichHTML(
+        context.enrichedBiographyPersonalDescription = await foundry.applications.ux.TextEditor.implementation.enrichHTML(
           context.document.system.biography.personalDescription.value,
           {
             async: true,
@@ -214,8 +241,7 @@ export default function () {
         )
       }
 
-      /* // FoundryVTT V12 */
-      const html = await (foundry.applications.handlebars?.renderTemplate ?? renderTemplate)('systems/' + FOLDER_ID + '/templates/actors/embed.hbs', context)
+      const html = await foundry.applications.handlebars.renderTemplate('systems/' + FOLDER_ID + '/templates/actors/embed.hbs', context)
 
       const div = document.createElement('div')
       div.innerHTML = html

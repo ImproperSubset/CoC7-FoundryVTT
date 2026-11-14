@@ -51,6 +51,7 @@ globalThis.fromUuid = async (uuid) => {
 globalThis.game = strict('game', {
   i18n: strict('game.i18n', {
     format: key => key,
+    lang: 'en',
     localize: key => key
   }),
   release: strict('game.release', {

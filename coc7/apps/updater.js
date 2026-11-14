@@ -1,4 +1,4 @@
-// cSpell:words Uniki Unik
+// cSpell:words bcoc7- caro-asercion delapouite john-colburn lorc lord-berandas sbed skoll Uniki Unik
 import { FOLDER_ID } from '../constants.js'
 import CoC7ChatChaseObstacle from './chat-chase-obstacle.js'
 import CoC7ChatCombatMelee from './chat-combat-melee.js'
@@ -11,7 +11,6 @@ import CoC7ConCheck from '../apps/con-check.js'
 import CoC7SanCheckCard from '../apps/san-check-card.js'
 import CoC7Utilities from './utilities.js'
 import CoCIDBatch from './coc-id-batch.js'
-import deprecated from '../deprecated.js'
 
 export default class CoC7Updater {
   /**
@@ -24,29 +23,20 @@ export default class CoC7Updater {
       systemUpdateVersion = game.system.version
       await game.settings.set(FOLDER_ID, 'systemUpdateVersion', systemUpdateVersion)
     }
+    const coc7Model = '9.0' // Last breaking model / css change
     const runMigrate = foundry.utils.isNewerVersion(game.system.version, systemUpdateVersion ?? '0')
     const updatedModules = game.settings.get(FOLDER_ID, 'systemUpdatedModuleVersion') || {}
     const currentModules = {}
-    const knownModuleVersions = {
-      'call-of-cthulhu-foundryvtt-investigator-wizard': '1.1.0', // cspell:disable-line
-      'cha-coc-fvtt-en-keeperitems': '1.4.0', // cspell:disable-line
-      'cha-coc-fvtt-en-notimetoscream': '1.1.0', // cspell:disable-line
-      'cha-coc-fvtt-en-quickstart': '5.1.0', // cspell:disable-line
-      'cha-coc-fvtt-en-starterset': '5.1.0' // cspell:disable-line
-    }
     for (const pack of game.packs) {
-      if (![FOLDER_ID, 'world'].includes(pack.metadata.packageName) && ['Actor', 'Item', 'Scene'].includes(pack.metadata.type)) {
+      if (![FOLDER_ID, 'world'].includes(pack.metadata.packageName) && ['Actor', 'Adventure', 'Item', 'Scene'].includes(pack.metadata.type)) {
         if (typeof currentModules[pack.metadata.packageName] === 'undefined') {
           // Only need to check each module once
           const module = game.modules.get(pack.metadata.packageName)
           if (module) {
             if (runMigrate || typeof updatedModules[module.id] === 'undefined' || String(updatedModules[module.id]) !== String(module.version)) {
-              // A migration is required, module has not been updated before, or the version number has changed, check against known good values
-              if (typeof knownModuleVersions[module.id] === 'string') {
-                if (foundry.utils.isNewerVersion(module.version, knownModuleVersions[module.id])) {
-                  currentModules[module.id] = module.version
-                }
-              } else {
+              if (typeof module.flags?.coc7Model === 'undefined') {
+                currentModules[module.id] = module.version
+              } else if (foundry.utils.isNewerVersion(coc7Model, module.flags.coc7Model)) {
                 currentModules[module.id] = module.version
               }
             }
@@ -60,7 +50,7 @@ export default class CoC7Updater {
           window: { title: 'CoC7.Migrate.Title' },
           content: game.i18n.format(Object.keys(currentModules).length === 0 ? 'CoC7.Migrate.Message' : 'CoC7.Migrate.WithModulesMessage', {
             version: game.system.version,
-            modules: '<ul style="margin: 0"><li>' + Object.keys(currentModules).map(mod => game.modules.get(mod).title).join('</li><li>') + '</li></ul>'
+            modules: '<ul class="without-margin"><li>' + Object.keys(currentModules).map(mod => game.modules.get(mod).title).join('</li><li>') + '</li></ul>'
           }),
           buttons: [{
             action: 'cancel',
@@ -162,6 +152,22 @@ export default class CoC7Updater {
     // Migrate World Scenes [Token] Actors
     for (const document of game.scenes.contents) {
       CoC7Updater.migrateSceneData({ document, documentUpdates, packId: '', parentUuid: '' })
+    }
+
+    console.log('PREPARE game.combats')
+    // Migrate World Combats Combatants
+    for (const combat of game.combats.contents) {
+      for (const document of combat.combatants) {
+        const image2 = String(document.img).match(/^(?:systems\/CoC7\/assets\/icons\/(?:skills\/)?|modules\/(?:call-of-cthulhu-foundryvtt-investigator-wizard|cha-coc-fvtt-en-(?:keeperitems|notimetoscream|theorderofthestone|arkham))\/assets\/game-icons\/[^/]+\/)([^/]+)/)
+        if (image2) {
+          const newName = CoC7Updater.gameIconsRemap(image2[1])
+          if (newName !== false) {
+            CoC7Updater.mergeEmbeddedDocuments(document, documentUpdates, 'Combatant', '', combat.uuid, {
+              img: 'systems/CoC7/assets/game-icons/' + newName
+            })
+          }
+        }
+      }
     }
 
     console.log('PREPARE game.packs')
@@ -293,6 +299,15 @@ export default class CoC7Updater {
           img: 'systems/CoC7/assets/icons/' + image[1]
         })
       }
+      const image2 = String(document.effects.contents[offset].img).match(/^(?:systems\/CoC7\/assets\/icons\/(?:skills\/)?|modules\/(?:call-of-cthulhu-foundryvtt-investigator-wizard|cha-coc-fvtt-en-(?:keeperitems|notimetoscream|theorderofthestone|arkham))\/assets\/game-icons\/[^/]+\/)([^/]+)/)
+      if (image2) {
+        const newName = CoC7Updater.gameIconsRemap(image2[1])
+        if (newName !== false) {
+          CoC7Updater.mergeEmbeddedDocuments(document.effects.contents[offset], documentUpdates, 'ActiveEffect', packId, document.uuid, {
+            img: 'systems/CoC7/assets/game-icons/' + newName
+          })
+        }
+      }
     }
   }
 
@@ -331,7 +346,7 @@ export default class CoC7Updater {
   static migrateSceneData ({ document, documentUpdates, packId = '', parentUuid = '' } = {}) {
     for (const token of document.tokens) {
       if (!token.actorLink && token.object?.actor) {
-        CoC7Updater._migrateTokenArtwork({ document: token, documentUpdates, packId, parentUuid })
+        CoC7Updater._migrateTokenArtwork({ document: token, documentUpdates, packId, parentUuid: document.uuid })
         CoC7Updater.migrateActorData({ document: token.object.actor, documentUpdates, packId, parentUuid: token.uuid })
       }
     }
@@ -352,6 +367,15 @@ export default class CoC7Updater {
         img: 'systems/CoC7/assets/icons/' + image[1]
       })
     }
+    const image2 = String(document.img).match(/^(?:systems\/CoC7\/assets\/icons\/(?:skills\/)?|modules\/(?:call-of-cthulhu-foundryvtt-investigator-wizard|cha-coc-fvtt-en-(?:keeperitems|notimetoscream|theorderofthestone|arkham))\/assets\/game-icons\/[^/]+\/)([^/]+)/)
+    if (image2) {
+      const newName = CoC7Updater.gameIconsRemap(image2[1])
+      if (newName !== false) {
+        CoC7Updater.mergeEmbeddedDocuments(document, documentUpdates, 'Item', packId, parentUuid, {
+          img: 'systems/CoC7/assets/game-icons/' + newName
+        })
+      }
+    }
     switch (document.type) {
       case 'archetype':
       case 'book':
@@ -367,6 +391,14 @@ export default class CoC7Updater {
             if (image) {
               document.system.itemDocuments[offset].img = 'systems/CoC7/assets/icons/' + image[1]
               changed = true
+            }
+            const image2 = String(document.system.itemDocuments[offset].img).match(/^(?:systems\/CoC7\/assets\/icons\/(?:skills\/)?|modules\/(?:call-of-cthulhu-foundryvtt-investigator-wizard|cha-coc-fvtt-en-(?:keeperitems|notimetoscream|theorderofthestone|arkham))\/assets\/game-icons\/[^/]+\/)([^/]+)/)
+            if (image2) {
+              const newName = CoC7Updater.gameIconsRemap(image2[1])
+              if (newName !== false) {
+                document.system.itemDocuments[offset].img = 'systems/CoC7/assets/game-icons/' + newName
+                changed = true
+              }
             }
             document.system.itemDocuments[offset] = JSON.stringify(document.system.itemDocuments[offset])
           }
@@ -391,6 +423,14 @@ export default class CoC7Updater {
               if (image) {
                 document.system.groups[offset2].itemDocuments[offset].img = 'systems/CoC7/assets/icons/' + image[1]
                 changed = true
+              }
+              const image2 = String(document.system.groups[offset2].itemDocuments[offset].img).match(/^(?:systems\/CoC7\/assets\/icons\/(?:skills\/)?|modules\/(?:call-of-cthulhu-foundryvtt-investigator-wizard|cha-coc-fvtt-en-(?:keeperitems|notimetoscream|theorderofthestone|arkham))\/assets\/game-icons\/[^/]+\/)([^/]+)/)
+              if (image2) {
+                const newName = CoC7Updater.gameIconsRemap(image2[1])
+                if (newName !== false) {
+                  document.system.groups[offset2].itemDocuments[offset].img = 'systems/CoC7/assets/game-icons/' + newName
+                  changed = true
+                }
               }
               document.system.groups[offset2].itemDocuments[offset] = JSON.stringify(document.system.groups[offset2].itemDocuments[offset])
             }
@@ -558,11 +598,16 @@ export default class CoC7Updater {
     if (document.type === 'chase') {
       // Migrate Actor flag to dataModel field
       if (typeof document.flags?.[FOLDER_ID]?.started !== 'undefined') {
-        CoC7Updater.mergeEmbeddedDocuments(document, documentUpdates, 'Item', packId, parentUuid, {
-          'system.system.started': document.flags[FOLDER_ID].started === true,
-          /* // FoundryVTT V13 */
-          ['flags.' + FOLDER_ID + '.-=started']: null
-        })
+        const newData = {
+          'system.system.started': document.flags[FOLDER_ID].started === true
+        }
+        /* // FoundryVTT V13 */
+        if (game.release.generation === 13) {
+          newData['flags.' + FOLDER_ID + '.-=started'] = null
+        } else {
+          newData['flags.' + FOLDER_ID + '.started'] = new foundry.data.operators.ForcedDeletion()
+        }
+        CoC7Updater.mergeEmbeddedDocuments(document, documentUpdates, 'Item', packId, parentUuid, newData)
       }
       // Migrate Participant roll RollString to Check Message Data
       let changed = false
@@ -641,7 +686,11 @@ export default class CoC7Updater {
             }
             participants[offset].speedCheck.checkData = checkData
             /* // FoundryVTT V13 */
-            participants[offset].speedCheck['-=rollDataString'] = null
+            if (game.release.generation === 13) {
+              participants[offset].speedCheck['-=rollDataString'] = null
+            } else {
+              participants[offset].speedCheck.rollDataString = new foundry.data.operators.ForcedDeletion()
+            }
             changed = true
           } catch (e) {
           }
@@ -726,7 +775,8 @@ export default class CoC7Updater {
     if (document.type === 'talent') {
       if (document.name === game.i18n.localize('CoC7.quickHealer') && document.effects.size === 0) {
         const effects = []
-        if (game.release.generation < 14) {
+        /* // FoundryVTT V13 */
+        if (game.release.generation === 13) {
           effects.push({
             name: game.i18n.localize('CoC7.quickHealer'),
             img: 'icons/svg/aura.svg',
@@ -776,12 +826,30 @@ export default class CoC7Updater {
         img: 'systems/CoC7/assets/icons/' + image[1]
       })
     }
+    const image2 = String(document.img).match(/^(?:systems\/CoC7\/assets\/icons\/(?:skills\/)?|modules\/(?:call-of-cthulhu-foundryvtt-investigator-wizard|cha-coc-fvtt-en-(?:keeperitems|notimetoscream|theorderofthestone|arkham))\/assets\/game-icons\/[^/]+\/)([^/]+)/)
+    if (image2) {
+      const newName = CoC7Updater.gameIconsRemap(image2[1])
+      if (newName !== false) {
+        CoC7Updater.mergeEmbeddedDocuments(document, documentUpdates, 'Actor', packId, parentUuid, {
+          img: 'systems/CoC7/assets/game-icons/' + newName
+        })
+      }
+    }
     if (typeof document.prototypeToken?.texture?.src !== 'undefined') {
       const image = String(document.prototypeToken.texture.src).match(/systems\/CoC7\/artwork\/icons\/(.+)/)
       if (image) {
         CoC7Updater.mergeEmbeddedDocuments(document, documentUpdates, 'Actor', packId, parentUuid, {
           'prototypeToken.texture.src': 'systems/CoC7/assets/icons/' + image[1]
         })
+      }
+      const image2 = String(document.prototypeToken.texture.src).match(/^(?:systems\/CoC7\/assets\/icons\/(?:skills\/)?|modules\/(?:call-of-cthulhu-foundryvtt-investigator-wizard|cha-coc-fvtt-en-(?:keeperitems|notimetoscream|theorderofthestone|arkham))\/assets\/game-icons\/[^/]+\/)([^/]+)/)
+      if (image2) {
+        const newName = CoC7Updater.gameIconsRemap(image2[1])
+        if (newName !== false) {
+          CoC7Updater.mergeEmbeddedDocuments(document, documentUpdates, 'Actor', packId, parentUuid, {
+            'prototypeToken.texture.src': 'systems/CoC7/assets/game-icons/' + newName
+          })
+        }
       }
     }
     for (const offset in document.effects?.contents ?? []) {
@@ -790,6 +858,15 @@ export default class CoC7Updater {
         CoC7Updater.mergeEmbeddedDocuments(document.effects.contents[offset], documentUpdates, 'ActiveEffect', packId, document.uuid, {
           img: 'systems/CoC7/assets/icons/' + image[1]
         })
+      }
+      const image2 = String(document.effects.contents[offset].img).match(/^(?:systems\/CoC7\/assets\/icons\/(?:skills\/)?|modules\/(?:call-of-cthulhu-foundryvtt-investigator-wizard|cha-coc-fvtt-en-(?:keeperitems|notimetoscream|theorderofthestone|arkham))\/assets\/game-icons\/[^/]+\/)([^/]+)/)
+      if (image2) {
+        const newName = CoC7Updater.gameIconsRemap(image2[1])
+        if (newName !== false) {
+          CoC7Updater.mergeEmbeddedDocuments(document.effects.contents[offset], documentUpdates, 'ActiveEffect', packId, document.uuid, {
+            img: 'systems/CoC7/assets/game-icons/' + newName
+          })
+        }
       }
     }
   }
@@ -836,35 +913,55 @@ export default class CoC7Updater {
   static _migrateActorFlags ({ document, documentUpdates, packId = '', parentUuid = '' } = {}) {
     // Move Actor.flags mythosHardened to Actor.system.flags
     if (typeof document.flags?.[FOLDER_ID]?.mythosHardened !== 'undefined') {
-      CoC7Updater.mergeEmbeddedDocuments(document, documentUpdates, 'Actor', packId, parentUuid, {
-        'system.flags.mythosHardened': document.flags[FOLDER_ID].mythosHardened === true,
-        /* // FoundryVTT V13 */
-        ['flags.' + FOLDER_ID + '.-=mythosHardened']: null
-      })
+      const newData = {
+        'system.flags.mythosHardened': document.flags[FOLDER_ID].mythosHardened === true
+      }
+      /* // FoundryVTT V13 */
+      if (game.release.generation === 13) {
+        newData['flags.' + FOLDER_ID + '.-=mythosHardened'] = null
+      } else {
+        newData['flags.' + FOLDER_ID + '.mythosHardened'] = new foundry.data.operators.ForcedDeletion()
+      }
+      CoC7Updater.mergeEmbeddedDocuments(document, documentUpdates, 'Actor', packId, parentUuid, newData)
     }
     // Move Actor.flags mythosInsanityExperienced to Actor.system.flags
     if (typeof document.flags?.[FOLDER_ID]?.mythosInsanityExperienced !== 'undefined') {
-      CoC7Updater.mergeEmbeddedDocuments(document, documentUpdates, 'Actor', packId, parentUuid, {
-        'system.flags.mythosInsanityExperienced': document.flags[FOLDER_ID].mythosInsanityExperienced === true,
-        /* // FoundryVTT V13 */
-        ['flags.' + FOLDER_ID + '.-=mythosInsanityExperienced']: null
-      })
+      const newData = {
+        'system.flags.mythosInsanityExperienced': document.flags[FOLDER_ID].mythosInsanityExperienced === true
+      }
+      /* // FoundryVTT V13 */
+      if (game.release.generation === 13) {
+        newData['flags.' + FOLDER_ID + '.-=mythosInsanityExperienced'] = null
+      } else {
+        newData['flags.' + FOLDER_ID + '.mythosInsanityExperienced'] = new foundry.data.operators.ForcedDeletion()
+      }
+      CoC7Updater.mergeEmbeddedDocuments(document, documentUpdates, 'Actor', packId, parentUuid, newData)
     }
     // Move Actor.flags skillListMode to Actor.system.flags
     if (typeof document.flags?.[FOLDER_ID]?.skillListMode !== 'undefined') {
-      CoC7Updater.mergeEmbeddedDocuments(document, documentUpdates, 'Actor', packId, parentUuid, {
-        'system.flags.skillListMode': document.flags[FOLDER_ID].skillListMode === true,
-        /* // FoundryVTT V13 */
-        ['flags.' + FOLDER_ID + '.-=skillListMode']: null
-      })
+      const newData = {
+        'system.flags.skillListMode': document.flags[FOLDER_ID].skillListMode === true
+      }
+      /* // FoundryVTT V13 */
+      if (game.release.generation === 13) {
+        newData['flags.' + FOLDER_ID + '.-=skillListMode'] = null
+      } else {
+        newData['flags.' + FOLDER_ID + '.skillListMode'] = new foundry.data.operators.ForcedDeletion()
+      }
+      CoC7Updater.mergeEmbeddedDocuments(document, documentUpdates, 'Actor', packId, parentUuid, newData)
     }
     // Move Actor.flags skillShowUncommon to Actor.system.flags
     if (typeof document.flags?.[FOLDER_ID]?.skillShowUncommon !== 'undefined') {
-      CoC7Updater.mergeEmbeddedDocuments(document, documentUpdates, 'Actor', packId, parentUuid, {
-        'system.flags.skillShowUncommon': document.flags[FOLDER_ID].skillShowUncommon === true,
-        /* // FoundryVTT V13 */
-        ['flags.' + FOLDER_ID + '.-=skillShowUncommon']: null
-      })
+      const newData = {
+        'system.flags.skillShowUncommon': document.flags[FOLDER_ID].skillShowUncommon === true
+      }
+      /* // FoundryVTT V13 */
+      if (game.release.generation === 13) {
+        newData['flags.' + FOLDER_ID + '.-=skillShowUncommon'] = null
+      } else {
+        newData['flags.' + FOLDER_ID + '.skillShowUncommon'] = new foundry.data.operators.ForcedDeletion()
+      }
+      CoC7Updater.mergeEmbeddedDocuments(document, documentUpdates, 'Actor', packId, parentUuid, newData)
     }
   }
 
@@ -880,16 +977,25 @@ export default class CoC7Updater {
     if (document.type === 'vehicle') {
       // Move vehicle attribs to vehicle stats
       if (typeof document.system?.description?.notes !== 'undefined') {
-        CoC7Updater.mergeEmbeddedDocuments(document, documentUpdates, 'Actor', packId, parentUuid, {
-          'system.description.keeper': document.system.description.notes,
-          /* // FoundryVTT V13 */
-          'system.description.-=notes': null
-        })
-      }
-      CoC7Updater.mergeEmbeddedDocuments(document, documentUpdates, 'Actor', packId, parentUuid, {
+        const newData = {
+          'system.description.keeper': document.system.description.notes
+        }
         /* // FoundryVTT V13 */
-        'system.-=attribs': null
-      })
+        if (game.release.generation === 13) {
+          newData['system.description.-=notes'] = null
+        } else {
+          newData['system.description.notes'] = new foundry.data.operators.ForcedDeletion()
+        }
+        CoC7Updater.mergeEmbeddedDocuments(document, documentUpdates, 'Actor', packId, parentUuid, newData)
+      }
+      const newData = {}
+      /* // FoundryVTT V13 */
+      if (game.release.generation === 13) {
+        newData['system.-=attribs'] = null
+      } else {
+        newData['system.attribs'] = new foundry.data.operators.ForcedDeletion()
+      }
+      CoC7Updater.mergeEmbeddedDocuments(document, documentUpdates, 'Actor', packId, parentUuid, newData)
     }
   }
 
@@ -952,6 +1058,15 @@ export default class CoC7Updater {
         img: 'systems/CoC7/assets/icons/' + image[1]
       })
     }
+    const image2 = String(document.img).match(/^(?:systems\/CoC7\/assets\/icons\/(?:skills\/)?|modules\/(?:call-of-cthulhu-foundryvtt-investigator-wizard|cha-coc-fvtt-en-(?:keeperitems|notimetoscream|theorderofthestone|arkham))\/assets\/game-icons\/[^/]+\/)([^/]+)/)
+    if (image2) {
+      const newName = CoC7Updater.gameIconsRemap(image2[1])
+      if (newName !== false) {
+        CoC7Updater.mergeEmbeddedDocuments(document, documentUpdates, 'Macro', packId, parentUuid, {
+          img: 'systems/CoC7/assets/game-icons/' + newName
+        })
+      }
+    }
   }
 
   /**
@@ -969,12 +1084,30 @@ export default class CoC7Updater {
         img: 'systems/CoC7/assets/icons/' + image[1]
       })
     }
+    const image2 = String(document.img).match(/^(?:systems\/CoC7\/assets\/icons\/(?:skills\/)?|modules\/(?:call-of-cthulhu-foundryvtt-investigator-wizard|cha-coc-fvtt-en-(?:keeperitems|notimetoscream|theorderofthestone|arkham))\/assets\/game-icons\/[^/]+\/)([^/]+)/)
+    if (image2) {
+      const newName = CoC7Updater.gameIconsRemap(image2[1])
+      if (newName !== false) {
+        CoC7Updater.mergeEmbeddedDocuments(document, documentUpdates, 'RollTable', packId, parentUuid, {
+          img: 'systems/CoC7/assets/game-icons/' + newName
+        })
+      }
+    }
     for (const offset in document.results.contents ?? []) {
       const image = String(document.results.contents[offset].img).match(/systems\/CoC7\/artwork\/icons\/(.+)/)
       if (image) {
         CoC7Updater.mergeEmbeddedDocuments(document.results.contents[offset], documentUpdates, 'TableResult', packId, document.uuid, {
           img: 'systems/CoC7/assets/icons/' + image[1]
         })
+      }
+      const image2 = String(document.results.contents[offset].img).match(/^(?:systems\/CoC7\/assets\/icons\/(?:skills\/)?|modules\/(?:call-of-cthulhu-foundryvtt-investigator-wizard|cha-coc-fvtt-en-(?:keeperitems|notimetoscream|theorderofthestone|arkham))\/assets\/game-icons\/[^/]+\/)([^/]+)/)
+      if (image2) {
+        const newName = CoC7Updater.gameIconsRemap(image2[1])
+        if (newName !== false) {
+          CoC7Updater.mergeEmbeddedDocuments(document.results.contents[offset], documentUpdates, 'TableResult', packId, document.uuid, {
+            img: 'systems/CoC7/assets/game-icons/' + newName
+          })
+        }
       }
     }
   }
@@ -994,6 +1127,24 @@ export default class CoC7Updater {
         img: 'systems/CoC7/assets/icons/' + image[1]
       })
     }
+    const image2 = String(document.img).match(/^(?:systems\/CoC7\/assets\/icons\/(?:skills\/)?|modules\/(?:call-of-cthulhu-foundryvtt-investigator-wizard|cha-coc-fvtt-en-(?:keeperitems|notimetoscream|theorderofthestone|arkham))\/assets\/game-icons\/[^/]+\/)([^/]+)/)
+    if (image2) {
+      const newName = CoC7Updater.gameIconsRemap(image2[1])
+      if (newName !== false) {
+        CoC7Updater.mergeEmbeddedDocuments(document, documentUpdates, 'Token', packId, parentUuid, {
+          img: 'systems/CoC7/assets/game-icons/' + newName
+        })
+      }
+    }
+    const image3 = String(document.texture?.src).match(/^(?:systems\/CoC7\/assets\/icons\/(?:skills\/)?|modules\/(?:call-of-cthulhu-foundryvtt-investigator-wizard|cha-coc-fvtt-en-(?:keeperitems|notimetoscream|theorderofthestone|arkham))\/assets\/game-icons\/[^/]+\/)([^/]+)/)
+    if (image3) {
+      const newName = CoC7Updater.gameIconsRemap(image3[1])
+      if (newName !== false) {
+        CoC7Updater.mergeEmbeddedDocuments(document, documentUpdates, 'Token', packId, parentUuid, {
+          'texture.src': 'systems/CoC7/assets/game-icons/' + newName
+        })
+      }
+    }
   }
 
   /**
@@ -1004,14 +1155,9 @@ export default class CoC7Updater {
     const deleteIds = []
 
     let progressBar = {
+      bar: ui.notifications.info('DOCUMENT.ChatMessages', { localize: true, progress: true, console: false }),
       current: 0,
       max: game.messages.contents.length + 1 // Will always call pct = 1 after progress to prevent rounding issues
-    }
-    /* // FoundryVTT V12 */
-    if (foundry.utils.isNewerVersion(game.version, 13)) {
-      progressBar.bar = ui.notifications.info('DOCUMENT.ChatMessages', { localize: true, progress: true, console: false })
-    } else {
-      progressBar.bar = deprecated.displayProgressBar(game.i18n.localize('DOCUMENT.ChatMessages'))
     }
     for (const offset in game.messages.contents) {
       progressBar.bar.update({ pct: progressBar.current / progressBar.max })
@@ -1091,6 +1237,27 @@ export default class CoC7Updater {
         } catch (e) {
           ui.notifications.error('CoC7.Errors.UnableToMigrateMessages', { localize: true })
         }
+      } else {
+        let changed = false
+        let content = message.content
+        if (message.content.indexOf('coc7-book-gains') > -1) {
+          content = content.replace(/\bcoc7-book-gains-header\b/g, 'coc7-header').replace(/\bcoc7-book-gains-row\b/g, 'coc7-row').replace(/\bcoc7-book-gains\b/g, 'coc7-table').replace(/\bcoc7-spell-gains-header\b/g, 'coc7-header').replace(/\bcoc7-spell-gains-row\b/g, 'coc7-row')
+          changed = true
+        }
+        if (message.content.indexOf('coc7-target-name') > -1) {
+          content = content.replace(/\bcoc7-target-name\b/g, 'coc7-chat-content')
+          changed = true
+        }
+        if (['CoC7ChatCombatMelee', 'CoC7ChatCombatRanged', 'CoC7ChatDamage'].includes(message.flags[FOLDER_ID]?.load?.as) && message.content.indexOf('coc7-formatted-text') > -1) {
+          content = content.replace(/\bcoc7-formatted-text\b/g, 'overflowable')
+          changed = true
+        }
+        if (changed) {
+          updates.push({
+            _id: message.id,
+            content
+          })
+        }
       }
     }
     progressBar.bar.remove()
@@ -1106,5 +1273,334 @@ export default class CoC7Updater {
         }, 500)
       }
     }
+  }
+
+  /**
+   * Convert renamed icons to original name
+   * @param {string} oldName
+   * @returns {string}
+   */
+  static gameIconsRemap (oldName) {
+    switch (oldName) {
+      case 'accounting.svg':
+      case 'money-stack.svg':
+        return 'delapouite/money-stack.svg'
+      case 'animal_handling.svg':
+      case 'jumping-dog.svg':
+        return 'delapouite/jumping-dog.svg'
+      case 'anthropology.svg':
+      case 'human-pyramid.svg':
+        return 'delapouite/human-pyramid.svg'
+      case 'appraise.svg':
+      case 'glass-ball.svg':
+        return 'delapouite/glass-ball.svg'
+      case 'archaeology.svg':
+      case 'great-pyramid.svg':
+        return 'delapouite/great-pyramid.svg'
+      case 'archive-register.svg':
+        return 'delapouite/archive-register.svg'
+      case 'arm-sling.svg':
+        return 'delapouite/arm-sling.svg'
+      case 'art_craft_acting.svg':
+      case 'theater-curtains.svg':
+        return 'delapouite/theater-curtains.svg'
+      case 'art_craft_any.svg':
+      case 'shining-heart.svg':
+        return 'lorc/shining-heart.svg'
+      case 'art_craft_fine_art.svg':
+      case 'paint-brush.svg':
+        return 'delapouite/paint-brush.svg'
+      case 'art_craft_forgery.svg':
+      case 'paper-tray.svg':
+        return 'delapouite/paper-tray.svg'
+      case 'art_craft_photography.svg':
+      case 'photo-camera.svg':
+        return 'delapouite/photo-camera.svg'
+      case 'barrier.svg':
+        return 'delapouite/barrier.svg'
+      case 'cartwheel.svg':
+        return 'lorc/cartwheel.svg'
+      case 'charm.svg':
+        return 'lorc/charm.svg'
+      case 'church.svg':
+        return 'delapouite/church.svg'
+      case 'classical_knowledge.svg':
+      case 'classical-knowledge.svg':
+        return 'delapouite/classical-knowledge.svg'
+      case 'climb.svg':
+      case 'mountain-road.svg':
+        return 'delapouite/mountain-road.svg'
+      case 'cog.svg':
+        return 'lorc/cog.svg'
+      case 'computer_use.svg':
+      case 'computing.svg':
+        return 'lord-berandas/computing.svg'
+      case 'credit_rating.svg':
+      case 'credits-currency.svg':
+        return 'delapouite/credits-currency.svg'
+      case 'cthulhu_mythos.svg':
+      case 'fish-monster.svg':
+        return 'delapouite/fish-monster.svg'
+      case 'cultist.svg':
+        return 'lorc/cultist.svg'
+      case 'demolitions.svg':
+      case 'demolish.svg':
+        return 'lorc/demolish.svg'
+      case 'diploma.svg':
+        return 'delapouite/diploma.svg'
+      case 'disguise.svg':
+      case 'domino-mask.svg':
+        return 'lorc/domino-mask.svg'
+      case 'diving_helmet.svg':
+      case 'diving-helmet.svg':
+        return 'delapouite/diving-helmet.svg'
+      case 'dodge.svg':
+      case 'dodging.svg':
+        return 'lorc/dodging.svg'
+      case 'diving.svg':
+      case 'pool-dive.svg':
+        return 'delapouite/pool-dive.svg'
+      case 'drive_auto.svg':
+      case 'race-car.svg':
+        return 'skoll/race-car.svg'
+      case 'electrical_repair.svg':
+      case 'electrical-resistance.svg':
+        return 'delapouite/electrical-resistance.svg'
+      case 'electronics.svg':
+      case 'musical-keyboard.svg':
+        return 'delapouite/musical-keyboard.svg'
+      case 'evasion.svg':
+        return 'delapouite/evasion.svg'
+      case 'eye-shield.svg':
+        return 'lorc/eye-shield.svg'
+      case 'falling.svg':
+        return 'sbed/falling.svg'
+      case 'fast_talk.svg':
+      case 'back-forth.svg':
+        return 'lorc/back-forth.svg'
+      case 'fighting_axe.svg':
+      case 'sharp-axe.svg':
+        return 'delapouite/sharp-axe.svg'
+      case 'fighting_brawl.svg':
+      case 'mailed-fist.svg':
+        return 'lorc/mailed-fist.svg'
+      case 'fighting_chainsaw.svg':
+      case 'chainsaw.svg':
+        return 'delapouite/chainsaw.svg'
+      case 'fighting_flail.svg':
+      case 'flail.svg':
+        return 'delapouite/flail.svg'
+      case 'fighting_garrote.svg':
+      case 'skipping-rope.svg':
+        return 'delapouite/skipping-rope.svg'
+      case 'fighting_spear.svg':
+      case 'spear-feather.svg':
+        return 'delapouite/spear-feather.svg'
+      case 'fighting_sword.svg':
+      case 'sword-clash.svg':
+        return 'lorc/sword-clash.svg'
+      case 'fighting_throw.svg':
+      case 'throwing-ball.svg':
+        return 'delapouite/throwing-ball.svg'
+      case 'fighting_whip.svg':
+      case 'whip.svg':
+        return 'lorc/whip.svg'
+      case 'firearms_artillery.svg':
+      case 'missile-launcher.svg':
+        return 'delapouite/missile-launcher.svg'
+      case 'firearms_bow.svg':
+      case 'pocket-bow.svg':
+        return 'lorc/pocket-bow.svg'
+      case 'firearms_flamethrower.svg':
+      case 'flamethrower.svg':
+        return 'delapouite/flamethrower.svg'
+      case 'firearms_handgun.svg':
+      case 'pistol-gun.svg':
+        return 'john-colburn/pistol-gun.svg'
+      case 'firearms_heavy_weapons.svg':
+      case 'missile-pod.svg':
+        return 'lorc/missile-pod.svg'
+      case 'firearms_machine_gun.svg':
+      case 'machine-gun.svg':
+        return 'skoll/machine-gun.svg'
+      case 'firearms_rifle_shotgun.svg':
+      case 'winchester-rifle.svg':
+        return 'skoll/winchester-rifle.svg'
+      case 'firearms_submachine_gun.svg':
+      case 'machine-gun-magazine.svg':
+        return 'delapouite/machine-gun-magazine.svg'
+      case 'first_aid.svg':
+      case 'first-aid-kit.svg':
+        return 'delapouite/first-aid-kit.svg'
+      case 'floating-tentacles.svg':
+        return 'delapouite/floating-tentacles.svg'
+      case 'hanging-spider.svg':
+        return 'lorc/hanging-spider.svg'
+      case 'hazard-sign.svg':
+        return 'lorc/hazard-sign.svg'
+      case 'heart-beats.svg':
+        return 'delapouite/heart-beats.svg'
+      case 'history.svg':
+      case 'book-pile.svg':
+        return 'delapouite/book-pile.svg'
+      case 'hypnosis.svg':
+      case 'twirl-center.svg':
+        return 'lorc/twirl-center.svg'
+      case 'intimidate.svg':
+      case 'tired-eye.svg':
+        return 'delapouite/tired-eye.svg'
+      case 'jeep.svg':
+        return 'delapouite/jeep.svg'
+      case 'jump.svg':
+      case 'jump-across.svg':
+        return 'delapouite/jump-across.svg'
+      case 'knocked-out-stars.svg':
+        return 'delapouite/knocked-out-stars.svg'
+      case 'language.svg':
+      case 'talk.svg':
+        return 'skoll/talk.svg'
+      case 'lasso.svg':
+        return 'delapouite/lasso.svg'
+      case 'laurel_crown.svg':
+      case 'laurel-crown.svg':
+        return 'lorc/laurel-crown.svg'
+      case 'law.svg':
+      case '3d-hammer.svg':
+        return 'delapouite/3d-hammer.svg'
+      case 'library_use.svg':
+      case 'archive-research.svg':
+        return 'delapouite/archive-research.svg'
+      case 'listen.svg':
+      case 'sound-on.svg':
+        return 'delapouite/sound-on.svg'
+      case 'locksmith.svg':
+      case 'house-keys.svg':
+        return 'delapouite/house-keys.svg'
+      case 'mechanical_repair.svg':
+      case 'mechanical-arm.svg':
+        return 'lorc/mechanical-arm.svg'
+      case 'medicine.svg':
+      case 'plague-doctor-profile.svg':
+        return 'delapouite/plague-doctor-profile.svg'
+      case 'natural_world.svg':
+      case 'forest.svg':
+        return 'delapouite/forest.svg'
+      case 'navigate.svg':
+      case 'earth-america.svg':
+        return 'delapouite/earth-america.svg'
+      case 'occult.svg':
+      case 'evil-book.svg':
+        return 'lorc/evil-book.svg'
+      case 'operate_heavy_machinery.svg':
+      case 'melting-metal.svg':
+        return 'delapouite/melting-metal.svg'
+      case 'paranoia.svg':
+        return 'lorc/paranoia.svg'
+      case 'pentagram-rose.svg':
+        return 'lorc/pentagram-rose.svg'
+      case 'persuade.svg':
+      case 'conversation.svg':
+        return 'lorc/conversation.svg'
+      case 'pilot_any.svg':
+      case 'ship-wheel.svg':
+        return 'delapouite/ship-wheel.svg'
+      case 'poker-hand.svg':
+        return 'lorc/poker-hand.svg'
+      case 'psychoanalysis.svg':
+      case 'psychic-waves.svg':
+        return 'lorc/psychic-waves.svg'
+      case 'psychology.svg':
+      case 'all-seeing-eye.svg':
+        return 'delapouite/all-seeing-eye.svg'
+      case 'read_lips.svg':
+      case 'lips.svg':
+        return 'lorc/lips.svg'
+      case 'ride.svg':
+      case 'horse-head.svg':
+        return 'delapouite/horse-head.svg'
+      case 'rolling-dices.svg':
+        return 'delapouite/rolling-dices.svg'
+      case 'round-potion.svg':
+        return 'caro-asercion/round-potion.svg'
+      case 'science_any.svg':
+      case 'materials-science.svg':
+        return 'lorc/materials-science.svg'
+      case 'science_astronomy.svg':
+      case 'ringed-planet.svg':
+        return 'lorc/ringed-planet.svg'
+      case 'science_biology.svg':
+      case 'dna2.svg':
+        return 'lorc/dna2.svg'
+      case 'science_botany.svg':
+      case 'plant-seed.svg':
+        return 'delapouite/plant-seed.svg'
+      case 'science_chemistry.svg':
+      case 'chemical-drop.svg':
+        return 'lorc/chemical-drop.svg'
+      case 'science_cryptography.svg':
+      case 'flower-emblem.svg':
+        return 'delapouite/flower-emblem.svg'
+      case 'science_forensics.svg':
+      case 'bloody-stash.svg':
+        return 'lorc/bloody-stash.svg'
+      case 'science_geology.svg':
+      case 'earth-spit.svg':
+        return 'lorc/earth-spit.svg'
+      case 'science_mathematics.svg':
+      case 'calculator.svg':
+        return 'delapouite/calculator.svg'
+      case 'science_meteorology.svg':
+      case 'cloud-download.svg':
+        return 'delapouite/cloud-download.svg'
+      case 'science_pharmacy.svg':
+      case 'pill.svg':
+        return 'lorc/pill.svg'
+      case 'science_physics.svg':
+      case 'vibrating-ball.svg':
+        return 'lorc/vibrating-ball.svg'
+      case 'science_zoology.svg':
+      case 'animal-skull.svg':
+        return 'lorc/animal-skull.svg'
+      case 'secret-book.svg':
+        return 'delapouite/secret-book.svg'
+      case 'shaking-hands.svg':
+        return 'delapouite/shaking-hands.svg'
+      case 'skills.svg':
+        return 'delapouite/skills.svg'
+      case 'sleight_of_hand.svg':
+      case 'hand.svg':
+        return 'lorc/hand.svg'
+      case 'spanner.svg':
+        return 'lorc/spanner.svg'
+      case 'spot_hidden.svg':
+      case 'magnifying-glass.svg':
+        return 'lorc/magnifying-glass.svg'
+      case 'stealth.svg':
+      case 'hidden.svg':
+        return 'lorc/hidden.svg'
+      case 'survival_any.svg':
+      case 'campfire.svg':
+        return 'lorc/campfire.svg'
+      case 'swim.svg':
+      case 'swimfins.svg': // cspell:disable-line
+        return 'delapouite/swimfins.svg' // cspell:disable-line
+      case 'tentacles-skull.svg':
+        return 'lorc/tentacles-skull.svg'
+      case 'thumb-up.svg':
+        return 'delapouite/thumb-up.svg'
+      case 'time-trap.svg':
+        return 'lorc/time-trap.svg'
+      case 'tombstone.svg':
+        return 'lorc/tombstone.svg'
+      case 'track.svg':
+      case 'deer-track.svg':
+        return 'delapouite/deer-track.svg'
+      case 'whiplash.svg':
+        return 'lorc/whiplash.svg'
+      case 'wolf-trap.svg':
+        return 'lorc/wolf-trap.svg'
+    }
+    console.log('Unknown Game Icons Remap', oldName)
+    return false
   }
 }

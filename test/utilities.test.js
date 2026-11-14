@@ -2,7 +2,7 @@ import { strict } from './foundry-stubs.js'
 import { mock, test } from 'node:test'
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
-import yaml from 'js-yaml'
+import { loadAll } from 'js-yaml'
 import CoC7Utilities from '../coc7/apps/utilities.js'
 import CoCID from '../coc7/apps/coc-id.js'
 
@@ -28,7 +28,7 @@ function item (type, name, cocid) {
 }
 
 test('toKebabCase turns every system skill name into its CoC ID', () => {
-  const skills = yaml.loadAll(fs.readFileSync(new URL('../compendiums/en-skills.yaml', import.meta.url), 'utf8'))
+  const skills = loadAll(fs.readFileSync(new URL('../compendiums/en-skills.yaml', import.meta.url), 'utf8'))
     .filter(doc => doc?.type === 'skill' && typeof doc.flags?.CoC7?.cocidFlag?.id === 'string')
   assert.ok(skills.length > 0)
   const mismatches = skills.filter(doc => 'i.skill.' + CoC7Utilities.toKebabCase(doc.name) !== doc.flags.CoC7.cocidFlag.id)

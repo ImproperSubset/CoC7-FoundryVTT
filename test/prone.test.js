@@ -398,7 +398,7 @@ async function meleeCard ({ participant, response, poolKeys }) {
   const data = await (await CoC7ChatCombatMelee.loadFromMessage(message)).getTemplateData()
   return {
     finalPoolModifier: data.finalPoolModifier,
-    poolBonus: data.poolBonus.map(row => row.key).sort()
+    poolBonus: data.poolBonus.map(row => row.value).sort()
   }
 }
 

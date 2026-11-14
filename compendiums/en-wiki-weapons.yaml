@@ -312,7 +312,7 @@ flags:
 ---
 name: Mnvr
 type: weapon
-img: systems/CoC7/assets/icons/skills/fighting_brawl.svg
+img: systems/CoC7/assets/game-icons/lorc/mailed-fist.svg
 folder: 2r5xD2GY15lSTtEm
 system:
   skill:
@@ -444,7 +444,7 @@ flags:
 ---
 name: Unarmed
 type: weapon
-img: systems/CoC7/assets/icons/skills/fighting_brawl.svg
+img: systems/CoC7/assets/game-icons/lorc/mailed-fist.svg
 folder: 2r5xD2GY15lSTtEm
 system:
   skill:

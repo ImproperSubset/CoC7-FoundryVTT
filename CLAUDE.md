@@ -30,8 +30,9 @@ Versions, releases and taking a new upstream release are in
 - Code here imitates the maintainer's own style exactly: copy the shapes of the
   neighbouring code (Dhole's House importer, `journalStyle`, `eras`), JSDoc on
   every method, `typeof x === 'undefined'` checks, `foundry.utils.setProperty`
-  with dotted paths, `/* // FoundryVTT V12 */` markers. Add no UI strings unless
-  asked; any new key goes in `en.json` only.
+  with dotted paths, `/* // FoundryVTT V13 */` markers on code kept for the
+  oldest Foundry release supported. Add no UI strings unless asked; any new key
+  goes in `en.json` only.
 - Before every commit: `npx eslint --fix` on the changed files only (never the
   whole tree), then `npm run eslint` with zero errors and zero warnings,
   `npx cspell` on the changed files against `cspell.json`, `npm test`, and
