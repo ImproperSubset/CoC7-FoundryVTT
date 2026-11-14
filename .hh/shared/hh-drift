@@ -1,0 +1,546 @@
+#!/usr/bin/env python3
+"""Check a project's diary decisions and the doc citations of them.
+
+Mechanical checks only, each with an exact answer:
+
+- a citation `(diary decision YYYY-MM-DD: <topic>)` names a decision heading
+  that exists, exactly one, and one no later decision replaces;
+- a `Replaces: <diary file>, <topic>` line names an existing decision;
+- no decision is replaced by two others;
+- no decision topic contains parentheses, unless a later decision replaces
+  it (renaming is the fix, and old entries are never edited);
+- a `CC_NO_DOC: <reason>` line sits in a decision or a correction, and gives
+  a reason;
+- a `Withdrawn: <reason>` line sits in a correction, and gives a reason; the
+  decision it names is then no longer in force, as a replaced one is, and
+  its `Replaces` lines lapse, so the decisions it replaced are in force again;
+- a provisional decision in `PLAN.md`, a `- CC_PLAN_DECISION: <topic>` item
+  nested under its task, has a topic without parentheses, and each of its
+  `Replaces` lines names one existing decision still in force;
+- the plan's marker appears nowhere in the diary, since the commit that moves a
+  provisional decision there turns it into a decision heading.
+
+Citations are read from every tracked file outside the diary, code comments
+included, less symlinks, files that are not UTF-8 text, hh-rules' copies in
+`.hh/shared/`, and the rules and skills rulesync generates.
+
+With `--carried`, it checks instead that every decision in force is carried:
+cited somewhere, or marked by a `CC_NO_DOC` line in its own entry or in a
+correction to it. That is a separate commit check, so a project with older
+decisions that are neither can take it once they are settled.
+
+Whether a doc says what its decision says, and whether a later decision
+silently overrides an earlier one, need judgment and are left to the caller.
+
+Usage: hh-drift [--carried] [project root]. Prints one finding per line and
+exits 1 when there is any, 0 when there are none, 2 when it cannot run.
+"""
+
+import bisect
+import json
+import re
+import shutil
+import subprocess
+import sys
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import cast
+
+DECISION = re.compile(r"^## (\d{4}-\d{2}-\d{2}): CC_DIARY_DECISION: (.+?)\s*$")
+CORRECTION = re.compile(r"^## (\d{4}-\d{2}-\d{2}): Correction to (.+?)\s*$")
+HEADING = re.compile(r"^## ")
+REPLACES = re.compile(r"^\s*- Replaces: (.+?)\s*$")
+NO_DOC = re.compile(r"^\s*- CC_NO_DOC:(.*)$")
+NO_DOC_MARK = "CC_NO_DOC"
+WITHDRAWN = re.compile(r"^\s*- Withdrawn:(.*)$")
+COMMENT_LEADER = re.compile(r"^\s*(?://+|#+|/?\*+|--|;+)")
+CITE_START = re.compile(r"\(diary decision (\d{4}-\d{2}-\d{2}): ")
+PLAN_MARK = "CC_PLAN_DECISION"
+PLAN_DECISION = re.compile(r"^(\s*)- CC_PLAN_DECISION: (.+?)\s*$")
+PLAN_ITEM = re.compile(r"^(\s*)- ")
+
+EXIT_CLEAN = 0
+EXIT_FINDINGS = 1
+EXIT_CANNOT_RUN = 2
+
+
+@dataclass(eq=False)
+class Decision:
+    """A decision heading in the diary, and the decisions that replace it."""
+
+    file: str
+    line: int
+    date: str
+    topic: str
+    replaced_by: list["Decision"] = field(default_factory=list["Decision"])
+    no_doc: bool = False
+    cited: bool = False
+    withdrawn: bool = False
+
+    def in_force(self) -> bool:
+        """Return whether no later decision replaces it and none withdraws it."""
+        return not self.replaced_by and not self.withdrawn
+
+    def where(self) -> str:
+        """Return the file and line of the heading."""
+        return f"{self.file}:{self.line}"
+
+    def name(self) -> str:
+        """Return the date and topic, as a citation names them."""
+        return f"{self.date}: {self.topic}"
+
+
+@dataclass(eq=False)
+class Correction:
+    """A correction heading, which speaks for the decision it names."""
+
+    file: str
+    line: int
+    topic: str
+    no_doc: bool = False
+    withdrawn: bool = False
+    target: Decision | None = None
+
+    def decision(self, decisions: list[Decision]) -> Decision | None:
+        """Return the decision this correction speaks for, if any.
+
+        It is the latest decision with this topic written before the correction
+        that no earlier correction withdrew, so once a restatement is withdrawn,
+        a later correction reaches the decision its withdrawal restored.
+        """
+        named = [
+            d
+            for d in decisions
+            if d.topic == self.topic
+            and (d.file, d.line) < (self.file, self.line)
+            and not d.withdrawn
+        ]
+        return named[-1] if named else None
+
+
+@dataclass
+class Diary:
+    """What the diary holds: its decisions, corrections and Replaces links."""
+
+    decisions: list[Decision] = field(default_factory=list[Decision])
+    corrections: list[Correction] = field(default_factory=list[Correction])
+    links: list["Link"] = field(default_factory=list["Link"])
+
+
+@dataclass(frozen=True)
+class Link:
+    """A `Replaces` line and the entry it belongs to."""
+
+    owner: Decision | Correction
+    file: str
+    line: int
+    spec: str
+
+
+@dataclass
+class PlanDecision:
+    """A provisional decision in the plan, and its `Replaces` lines."""
+
+    line: int
+    indent: int
+    topic: str
+    replaces: list[tuple[int, str]] = field(default_factory=list[tuple[int, str]])
+
+
+class GitMissingError(Exception):
+    """Raised when git cannot be found to list the tracked files."""
+
+
+def read_entry_line(
+    text: str,
+    where: str,
+    owner: Decision | Correction | None,
+    diary: Diary,
+    findings: list[str],
+) -> None:
+    """Record a Replaces, CC_NO_DOC or Withdrawn line under its entry."""
+    if (m := REPLACES.match(text)) and owner is not None:
+        file, line = where.rsplit(":", 1)
+        diary.links.append(Link(owner, file, int(line), m[1]))
+    elif (m := WITHDRAWN.match(text)) and owner is not None:
+        if not isinstance(owner, Correction):
+            findings.append(f"{where}: Withdrawn outside a correction")
+        elif not m[1].strip():
+            findings.append(f"{where}: Withdrawn gives no reason")
+        else:
+            owner.withdrawn = True
+    elif m := NO_DOC.match(text):
+        if owner is None:
+            findings.append(f"{where}: {NO_DOC_MARK} outside a decision")
+        elif not m[1].strip():
+            findings.append(f"{where}: {NO_DOC_MARK} gives no reason")
+        else:
+            owner.no_doc = True
+
+
+def item_lines(lines: list[str], *, nested: bool = False) -> list[tuple[int, str]]:
+    """Return the numbered lines, each list item's wrapped lines joined onto it.
+
+    The formatter wraps a long list item, such as a Replaces line, onto lines
+    indented past its dash that follow it; another item or a blank line ends
+    it. Only top-level items take their wraps, as the diary's entries need,
+    unless `nested`, as the plan's decisions under their tasks need.
+    """
+    out: list[tuple[int, str]] = []
+    item_indent: int | None = None
+    for n, text in enumerate(lines, 1):
+        stripped = text.lstrip()
+        indent = len(text) - len(stripped)
+        if (
+            item_indent is not None
+            and stripped
+            and not stripped.startswith("- ")
+            and indent > item_indent
+        ):
+            line, joined = out[-1]
+            out[-1] = (line, f"{joined} {stripped}")
+            continue
+        out.append((n, text))
+        item = PLAN_ITEM.match(text)
+        item_indent = len(item[1]) if item and (nested or not item[1]) else None
+    return out
+
+
+def read_diary(root: Path, findings: list[str]) -> Diary:
+    """Return the diary's entries, decisions in file-name order."""
+    diary = Diary()
+    for path in sorted((root / "diary").glob("*.md")):
+        rel = path.relative_to(root).as_posix()
+        owner: Decision | Correction | None = None
+        lines = path.read_text(encoding="utf-8").splitlines()
+        for n, text in item_lines(lines):
+            if m := DECISION.match(text):
+                owner = Decision(rel, n, m[1], m[2])
+                diary.decisions.append(owner)
+            elif m := CORRECTION.match(text):
+                owner = Correction(rel, n, m[2])
+                diary.corrections.append(owner)
+            elif HEADING.match(text):
+                owner = None
+                if "CC_DIARY_DECISION" in text:
+                    findings.append(f"{rel}:{n}: malformed decision heading: {text}")
+            else:
+                read_entry_line(text, f"{rel}:{n}", owner, diary, findings)
+            if PLAN_MARK in text:
+                findings.append(f"{rel}:{n}: plan decision marker in the diary")
+    return diary
+
+
+def read_plan(root: Path, findings: list[str]) -> list[PlanDecision]:
+    """Return the plan's provisional decisions, with their Replaces lines."""
+    path = root / "PLAN.md"
+    if not path.is_file():
+        return []
+    plan: list[PlanDecision] = []
+    current: PlanDecision | None = None
+    lines = path.read_text(encoding="utf-8").splitlines()
+    for n, text in item_lines(lines, nested=True):
+        item = PLAN_ITEM.match(text)
+        if m := PLAN_DECISION.match(text):
+            current = PlanDecision(n, len(m[1]), m[2])
+            plan.append(current)
+            if not m[1]:
+                findings.append(f"PLAN.md:{n}: plan decision not under a task")
+        elif text.lstrip().startswith(f"- {PLAN_MARK}"):
+            # Only an item led by the marker is judged; a task may name the
+            # marker in its prose, as a migration step does.
+            findings.append(f"PLAN.md:{n}: malformed plan decision: {text.strip()}")
+        elif current is not None and item and len(item[1]) > current.indent:
+            if r := REPLACES.match(text):
+                current.replaces.append((n, r[1]))
+        elif item or (text.strip() and not text.startswith(" ")):
+            current = None
+    return plan
+
+
+def check_plan(
+    plan: list[PlanDecision],
+    decisions: list[Decision],
+    findings: list[str],
+) -> None:
+    """Report plan decisions whose topic or Replaces lines would not move."""
+    for p in plan:
+        if "(" in p.topic or ")" in p.topic:
+            findings.append(
+                f"PLAN.md:{p.line}: plan decision topic contains parentheses: "
+                f"{p.topic}",
+            )
+        for line, spec in p.replaces:
+            targets = resolve_target(spec, decisions)
+            if targets is None:
+                continue
+            where = f"PLAN.md:{line}"
+            if problem := replaces_problem(where, spec, targets):
+                findings.append(problem)
+            elif not targets[0].in_force():
+                findings.append(
+                    f"{where}: Replaces a decision no longer in force: {spec}",
+                )
+
+
+def resolve_corrections(diary: Diary, findings: list[str]) -> None:
+    """Report corrections naming no decision; pass their marks to the one named."""
+    for c in diary.corrections:
+        target = c.target = c.decision(diary.decisions)
+        if target is None:
+            where = f"{c.file}:{c.line}"
+            findings.append(f"{where}: correction names no decision: {c.topic}")
+            continue
+        target.no_doc = target.no_doc or c.no_doc
+        target.withdrawn = target.withdrawn or c.withdrawn
+
+
+def resolve_target(spec: str, decisions: list[Decision]) -> list[Decision] | None:
+    """Find the decisions a `<diary file>, <topic>` spec names.
+
+    Returns None for a spec that names no decision on purpose ("none").
+    """
+    if spec.lower().startswith("none"):
+        return None
+    if ", " not in spec:
+        return []
+    file, topic = spec.split(", ", 1)
+    file = file if file.startswith("diary/") else f"diary/{file}"
+    return [d for d in decisions if d.file == file and d.topic == topic]
+
+
+def replaces_problem(where: str, spec: str, targets: list[Decision]) -> str | None:
+    """Return the finding for a Replaces line naming no one decision, if any."""
+    if not targets:
+        return f"{where}: Replaces names no decision: {spec}"
+    if len(targets) > 1:
+        return f"{where}: Replaces is ambiguous, {len(targets)} decisions: {spec}"
+    return None
+
+
+def link_replacements(diary: Diary, findings: list[str]) -> None:
+    """Record which decisions replace which, reporting links that fail."""
+    for link in diary.links:
+        owner = link.owner
+        replacer = owner if isinstance(owner, Decision) else owner.target
+        if replacer is None:
+            continue
+        targets = resolve_target(link.spec, diary.decisions)
+        if targets is None:
+            continue
+        where = f"{link.file}:{link.line}"
+        if problem := replaces_problem(where, link.spec, targets):
+            findings.append(problem)
+        elif not replacer.withdrawn and replacer not in targets[0].replaced_by:
+            # A withdrawn decision replaces nothing: what it replaced holds again.
+            targets[0].replaced_by.append(replacer)
+
+
+def check_topics(decisions: list[Decision], findings: list[str]) -> None:
+    """Report parenthesised topics, and decisions replaced more than once."""
+    for d in decisions:
+        # A topic no longer in force is left alone: renaming is the fix, and
+        # the old entry can never be edited.
+        if ("(" in d.topic or ")" in d.topic) and d.in_force():
+            findings.append(f"{d.where()}: topic contains parentheses: {d.topic}")
+        if len(d.replaced_by) > 1:
+            by = ", ".join(r.where() for r in d.replaced_by)
+            findings.append(
+                f"{d.where()}: replaced by more than one decision ({by}): {d.name()}",
+            )
+
+
+def generated_paths(root: Path) -> tuple[set[str], set[str]]:
+    """Return the rule files and skill folders rulesync generates, from its lock."""
+    lock = root / "rulesync.lock"
+    rules: set[str] = set()
+    skills: set[str] = set()
+    if not lock.is_file():
+        return rules, skills
+    data: object = json.loads(lock.read_text(encoding="utf-8"))
+    if not isinstance(data, dict):
+        return rules, skills
+    sources = cast("dict[str, object]", data).get("sources")
+    if not isinstance(sources, dict):
+        return rules, skills
+    for source in cast("dict[str, object]", sources).values():
+        if not isinstance(source, dict):
+            continue
+        entry = cast("dict[str, object]", source)
+        resolved = entry.get("resolvedRuleNames")
+        if isinstance(resolved, list):
+            rules.update(
+                f".claude/rules/{name}.md"
+                for name in cast("list[object]", resolved)
+                if isinstance(name, str)
+            )
+        pinned = entry.get("skills")
+        if isinstance(pinned, dict):
+            skills.update(
+                f".claude/skills/{name}/" for name in cast("dict[str, object]", pinned)
+            )
+    return rules, skills
+
+
+def generated_rules(root: Path) -> set[str]:
+    """Return the rule files rulesync generates, from the project's lock."""
+    return generated_paths(root)[0]
+
+
+def doc_files(root: Path) -> list[str]:
+    """Return the tracked files whose citations are checked.
+
+    Every tracked file outside the diary counts, code included, less symlinks
+    (their targets are checked where they live), hh-rules' copies in
+    `.hh/shared/`, and the rules and skills rulesync generates.
+    """
+    git = shutil.which("git")
+    if git is None:
+        raise GitMissingError
+    out = subprocess.run(
+        [git, "-C", str(root), "ls-files", "-z"],
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout
+    rules, skills = generated_paths(root)
+    skipped = ("diary/", ".hh/shared/", *skills)
+    return [
+        p
+        for p in out.split("\0")
+        if p
+        and not p.startswith(skipped)
+        and p not in rules
+        and not (root / p).is_symlink()
+        and (root / p).is_file()
+    ]
+
+
+def read_text(path: Path) -> str | None:
+    """Return a file's text, or None when it is not UTF-8 text."""
+    try:
+        return path.read_text(encoding="utf-8")
+    except UnicodeDecodeError:
+        return None
+
+
+def check_citation(
+    rel: str,
+    line: int,
+    date: str,
+    rest: str,
+    by_date: dict[str, list[Decision]],
+) -> str | None:
+    """Return the finding for one citation, or None when it is sound."""
+    topics = sorted({d.topic for d in by_date.get(date, [])}, key=len, reverse=True)
+    topic = next((t for t in topics if rest.startswith(t + ")")), None)
+    if topic is None:
+        shown = rest.split(")", 1)[0]
+        return f"{rel}:{line}: cites no decision: {date}: {shown}"
+    named = [d for d in by_date[date] if d.topic == topic]
+    if len(named) > 1:
+        where = ", ".join(d.where() for d in named)
+        return f"{rel}:{line}: cites an ambiguous decision ({where}): {date}: {topic}"
+    named[0].cited = True
+    if named[0].replaced_by:
+        by = ", ".join(r.name() for r in named[0].replaced_by)
+        return (
+            f"{rel}:{line}: cites a replaced decision: {date}: {topic} "
+            f"(replaced by {by})"
+        )
+    if named[0].withdrawn:
+        return f"{rel}:{line}: cites a withdrawn decision: {date}: {topic}"
+    return None
+
+
+def flatten(text: str) -> tuple[str, list[int]]:
+    """Join text's lines into one, for matching citations that wrap.
+
+    Each line loses its leading comment marker, such as `//`, `#` or `*`, and
+    each run of whitespace becomes one space. Returns the joined text and the
+    offset in it where each line starts.
+    """
+    parts: list[str] = []
+    starts: list[int] = []
+    offset = 0
+    for raw in text.splitlines():
+        part = re.sub(r"\s+", " ", COMMENT_LEADER.sub("", raw)).strip()
+        starts.append(offset)
+        parts.append(part)
+        offset += len(part) + 1
+    return " ".join(parts), starts
+
+
+def check_citations(root: Path, decisions: list[Decision], findings: list[str]) -> None:
+    """Check every citation in the tracked files, marking the decisions cited."""
+    by_date: dict[str, list[Decision]] = {}
+    for d in decisions:
+        by_date.setdefault(d.date, []).append(d)
+    for rel in doc_files(root):
+        text = read_text(root / rel)
+        if text is None:
+            continue
+        flat, starts = flatten(text)
+        for m in CITE_START.finditer(flat):
+            line = bisect.bisect_right(starts, m.start())
+            finding = check_citation(rel, line, m[1], flat[m.end() :], by_date)
+            if finding is not None:
+                findings.append(finding)
+
+
+def check_carried(decisions: list[Decision], findings: list[str]) -> None:
+    """Report decisions in force that are neither cited nor marked docless."""
+    findings.extend(
+        f"{d.where()}: decision carried by no doc: {d.name()}"
+        for d in decisions
+        if d.in_force() and not d.cited and not d.no_doc
+    )
+
+
+def summary(decisions: list[Decision], findings: list[str]) -> str:
+    """Count the decisions in force by how they are carried, and the findings.
+
+    Replaced and withdrawn decisions are history, so they are left out, and a
+    decision both cited and marked docless counts as cited.
+    """
+    in_force = [d for d in decisions if d.in_force()]
+    cited = sum(d.cited for d in in_force)
+    docless = sum(d.no_doc and not d.cited for d in in_force)
+    neither = len(in_force) - cited - docless
+    return (
+        f"hh-drift: {len(in_force)} decisions in force: {cited} cited, "
+        f"{docless} marked docless, {neither} neither; {len(findings)} findings"
+    )
+
+
+def main(argv: list[str]) -> int:
+    """Run the checks on the project root argv names, or the current one."""
+    args = argv[1:]
+    carried = "--carried" in args
+    args = [a for a in args if a != "--carried"]
+    root = Path(args[0] if args else ".").resolve()
+    if not (root / "diary").is_dir():
+        print(f"hh-drift: no diary/ in {root}", file=sys.stderr)
+        return EXIT_CANNOT_RUN
+    findings: list[str] = []
+    diary = read_diary(root, findings)
+    resolve_corrections(diary, findings)
+    link_replacements(diary, findings)
+    check_topics(diary.decisions, findings)
+    check_plan(read_plan(root, findings), diary.decisions, findings)
+    try:
+        check_citations(root, diary.decisions, findings)
+    except GitMissingError:
+        print("hh-drift: git is not on PATH", file=sys.stderr)
+        return EXIT_CANNOT_RUN
+    if carried:
+        findings = []
+        check_carried(diary.decisions, findings)
+    for f in findings:
+        print(f)
+    print(summary(diary.decisions, findings), file=sys.stderr)
+    return EXIT_FINDINGS if findings else EXIT_CLEAN
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

@@ -1,0 +1,77 @@
+{
+  "lockfileVersion": 1,
+  "sources": {
+    "impropersubset/hh-rules": {
+      "requestedRef": "v0.24.0",
+      "resolvedRef": "cbef143321756dfb5716adc923ffdc16353fdcb5",
+      "resolvedAt": "2026-11-14T21:56:06.447Z",
+      "skills": {
+        "hh-dedupe": {
+          "integrity": "sha256-894987f277e8e123c2d33bc3823b4f34de713a6db4fb47cf965400f24295e485"
+        },
+        "hh-drift": {
+          "integrity": "sha256-c29dbc770ed1e7899e6644e091e2264763dc721dcdb8366c64272d8d092b750b"
+        },
+        "hh-wrap": {
+          "integrity": "sha256-ec473234b04e48991937f8237a7a48578436fce8bf6b49d05602f915c6f6706c"
+        }
+      },
+      "skillSelection": [
+        "hh-dedupe",
+        "hh-drift",
+        "hh-wrap"
+      ],
+      "skillsPath": "skills",
+      "rules": {
+        "diary": {
+          "integrity": "sha256-c8f3c27340eaa7ef2b82dc0c2c56503aa5ef18407c43b5a905ac00989cbeac3c"
+        },
+        "glossary": {
+          "integrity": "sha256-1e7f1fde16a1675bc735681478d32948058a67f8c90b99463394740e218a90c1"
+        },
+        "principles": {
+          "integrity": "sha256-6eec7f5cd8b381e18fc68c1d305ccd1ce1e40e7cd3bb76ae3bc727674753bc5f"
+        },
+        "sandbox": {
+          "integrity": "sha256-d02ab6c9243ae36e2da5850cd7f06a80ddc045e2ee73b8e76baf5eb526d627d4"
+        },
+        "zsh": {
+          "integrity": "sha256-492dbd679d1e361f7ec441e02547daacfea1ece5bc2be0d0109e1526b648957b"
+        }
+      },
+      "ruleSelection": [
+        "diary",
+        "glossary",
+        "principles",
+        "sandbox",
+        "zsh"
+      ],
+      "rulesPath": "rules",
+      "resolvedRuleNames": [
+        "diary",
+        "glossary",
+        "principles",
+        "sandbox",
+        "zsh"
+      ]
+    },
+    "kucherenko/jscpd": {
+      "requestedRef": "v5.4.1",
+      "resolvedRef": "095d6ca33e9f291c144bb05ef653b2bfdc3c1453",
+      "resolvedAt": "2026-11-14T21:56:07.224Z",
+      "skills": {
+        "dry-refactoring": {
+          "integrity": "sha256-74527e92b67366feb4add0c167c502d5d8d0c405a784daf4e24c4f7d73fda119"
+        },
+        "jscpd": {
+          "integrity": "sha256-6ca9fc9be97eee58e757018da7f6e94c03902fa1921f860e85ab7fc55ee53228"
+        }
+      },
+      "skillSelection": [
+        "dry-refactoring",
+        "jscpd"
+      ],
+      "skillsPath": "skills"
+    }
+  }
+}

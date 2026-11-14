@@ -1,0 +1,202 @@
+#!/usr/bin/env python3
+"""Report what a project says about its own license, for /hh-rules to act on.
+
+It reads, from the files git does not ignore, tracked or not:
+
+- whether the root has a REUSE.toml, and which license texts LICENSES/ holds;
+- the opening lines of each license file at the root (LICENSE, COPYING and
+  their variants), so a reader can name the license;
+- the license field of every package.json and pyproject.toml;
+- each SPDX license expression found in a file's license tag, with how many
+  files carry it, and how many text files carry none.
+
+It judges nothing and changes nothing: whether these agree is for the caller.
+reuse lint, the commit check, says whether the project complies.
+
+Usage: hh-license [project root]. Prints the report and exits 0, or exits 2
+when it cannot run.
+"""
+
+import json
+import re
+import shutil
+import subprocess
+import sys
+import tomllib
+from collections import Counter
+from dataclasses import dataclass, field
+from pathlib import Path, PurePosixPath
+from typing import cast
+
+EXIT_REPORTED = 0
+EXIT_CANNOT_RUN = 2
+
+# Built from two parts so that reuse lint, which reads this tag anywhere in a
+# file, does not take this line for the license of this file.
+TAG = "SPDX-" + "License-Identifier:"
+TAG_LINE = re.compile(re.escape(TAG) + r"\s*(.+?)\s*(?:-->|\*/)?\s*$")
+LICENSE_FILE = re.compile(r"^(LICEN[CS]E|COPYING)([.-].*)?$", re.IGNORECASE)
+OPENING_LINES = 2
+LICENSES_DIR = PurePosixPath("LICENSES")
+
+
+class CannotRunError(Exception):
+    """Raised when git cannot list the project's tracked files."""
+
+
+@dataclass
+class Report:
+    """What the project's files say about its license."""
+
+    reuse_toml: bool = False
+    license_texts: list[str] = field(default_factory=list[str])
+    license_files: dict[str, list[str]] = field(default_factory=dict[str, list[str]])
+    declared: dict[str, str] = field(default_factory=dict[str, str])
+    tags: Counter[str] = field(default_factory=Counter[str])
+    text_files: int = 0
+    untagged: int = 0
+
+    def lines(self) -> list[str]:
+        """Return the report as lines of text."""
+        out = [f"REUSE.toml: {'present' if self.reuse_toml else 'missing'}"]
+        texts = ", ".join(self.license_texts) if self.license_texts else "none"
+        out.append(f"LICENSES/: {texts}")
+        out.extend(
+            f"license file {name}: {' / '.join(opening) or '(empty)'}"
+            for name, opening in sorted(self.license_files.items())
+        )
+        if not self.license_files:
+            out.append("license file: none")
+        out.extend(
+            f"{name} license field: {value}"
+            for name, value in sorted(self.declared.items())
+        )
+        out.extend(
+            f"SPDX license tag {expr}: {count} files"
+            for expr, count in sorted(self.tags.items())
+        )
+        out.append(
+            f"text files without an SPDX license tag: {self.untagged} of "
+            f"{self.text_files}",
+        )
+        return out
+
+
+def tracked_files(root: Path) -> list[str]:
+    """Return the paths under root that git does not ignore, as reuse sees them."""
+    git = shutil.which("git")
+    if git is None:
+        msg = "git is not on PATH"
+        raise CannotRunError(msg)
+    result = subprocess.run(
+        [
+            git,
+            "-C",
+            str(root),
+            "ls-files",
+            "-z",
+            "--cached",
+            "--others",
+            "--exclude-standard",
+        ],
+        capture_output=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        msg = f"git ls-files failed in {root}"
+        raise CannotRunError(msg)
+    return [p for p in result.stdout.decode().split("\0") if p]
+
+
+def read_text(path: Path) -> str | None:
+    """Return a regular file's text, or None for a symlink or binary file."""
+    if path.is_symlink() or not path.is_file():
+        return None
+    try:
+        return path.read_text(encoding="utf-8")
+    except UnicodeDecodeError:
+        return None
+
+
+def opening(text: str) -> list[str]:
+    """Return the first non-blank lines of a license file."""
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    return lines[:OPENING_LINES]
+
+
+def package_license(text: str) -> str:
+    """Return the license field of a package.json."""
+    try:
+        data = cast("object", json.loads(text))
+    except json.JSONDecodeError:
+        return "(unreadable)"
+    if not isinstance(data, dict):
+        return "(none)"
+    value = cast("dict[str, object]", data).get("license")
+    return str(value) if value is not None else "(none)"
+
+
+def pyproject_license(text: str) -> str:
+    """Return the license field of a pyproject.toml's [project] table."""
+    try:
+        data = tomllib.loads(text)
+    except tomllib.TOMLDecodeError:
+        return "(unreadable)"
+    project = data.get("project")
+    if not isinstance(project, dict):
+        return "(none)"
+    value = cast("dict[str, object]", project).get("license")
+    if isinstance(value, dict):
+        table = cast("dict[str, object]", value)
+        value = table.get("text") or table.get("file")
+    return str(value) if value is not None else "(none)"
+
+
+def read_file(report: Report, name: str, text: str) -> None:
+    """Add what one tracked file says to the report."""
+    path = PurePosixPath(name)
+    if len(path.parts) == 1 and LICENSE_FILE.match(name):
+        report.license_files[name] = opening(text)
+    if path.name == "package.json":
+        report.declared[name] = package_license(text)
+    elif path.name == "pyproject.toml":
+        report.declared[name] = pyproject_license(text)
+    report.text_files += 1
+    found = {m.group(1) for line in text.splitlines() if (m := TAG_LINE.search(line))}
+    if found:
+        report.tags.update(found)
+    else:
+        report.untagged += 1
+
+
+def build_report(root: Path) -> Report:
+    """Read the project's tracked files into a report."""
+    report = Report()
+    for name in tracked_files(root):
+        path = PurePosixPath(name)
+        if name == "REUSE.toml":
+            report.reuse_toml = True
+        elif path.parent == LICENSES_DIR:
+            report.license_texts.append(path.name)
+        text = read_text(root / name)
+        if text is not None:
+            read_file(report, name, text)
+    report.license_texts.sort()
+    return report
+
+
+def main(argv: list[str]) -> int:
+    """Print the license report for the project root argv names."""
+    root = Path(argv[1] if len(argv) > 1 else ".").resolve()
+    try:
+        report = build_report(root)
+    except CannotRunError as err:
+        print(f"hh-license: {err}", file=sys.stderr)
+        return EXIT_CANNOT_RUN
+    for line in report.lines():
+        print(line)
+    return EXIT_REPORTED
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

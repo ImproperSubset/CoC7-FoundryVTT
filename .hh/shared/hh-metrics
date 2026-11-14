@@ -1,0 +1,166 @@
+#!/usr/bin/env bash
+# Prints each of the project's metrics as a diary paragraph, and its change
+# since the last such paragraph in the diary: duplication always, and test
+# coverage where the project has a pytest or vitest hook. In a fork, a project
+# with an `upstream` remote, it adds the fork's own copies and the coverage of
+# the lines it changed, both counted from where its branch last met upstream.
+# /hh-wrap puts the paragraphs in its session summary and the changes in its
+# report. Metrics are reported,
+# never judged: this script fails only when it cannot measure.
+#
+# The paragraph is matched with its whitespace collapsed, because mdformat may
+# wrap it across lines.
+set -uo pipefail
+
+root="$(git rev-parse --show-toplevel)" || exit 1
+cd "${root}" || exit 1
+
+# jscpd through the project's own prek hook, at its pinned version and
+# arguments. The `.:` selector runs the root project's hook only, not that of a
+# nested prek project.
+out="$(prek run .:jscpd --all-files 2>&1)"
+total="$(grep -F 'Total:' <<<"${out}" | tail -1)"
+if [[ -z "${total}" ]]; then
+    printf 'hh-metrics: no jscpd total in the output of prek run .:jscpd:\n%s\n' "${out}" >&2
+    exit 1
+fi
+# The total row's cells: files, lines, tokens, clones, duplicated lines.
+IFS='│' read -r _ _ files lines _ clones dup _ <<<"${total}"
+files="${files//[[:space:]]/}"
+lines="${lines//[[:space:]]/}"
+clones="${clones//[[:space:]]/}"
+dup_lines="$(sed -E 's/^ *([0-9]+) .*/\1/' <<<"${dup}")"
+dup_pct="$(sed -E 's/.*\(([0-9.]+)%\).*/\1/' <<<"${dup}")"
+for v in "${files}" "${lines}" "${clones}" "${dup_lines}" "${dup_pct}"; do
+    if [[ ! "${v}" =~ ^[0-9.]+$ ]]; then
+        printf 'hh-metrics: could not read the jscpd total row: %s\n' "${total}" >&2
+        exit 1
+    fi
+done
+
+dup_now="Metrics: duplication ${clones} clones, ${dup_lines} of ${lines} lines (${dup_pct}%) in ${files} files."
+dup_pattern='Metrics: duplication [0-9]+ clones, [0-9]+ of [0-9]+ lines \([0-9.]+%\) in [0-9]+ files\.'
+
+# Coverage through the project's pytest hook, when it has one (the Python
+# pack). The TOTAL row of pytest-cov's report gives statements, missed and the
+# percentage.
+cov_now=""
+cov_pattern='Metrics: coverage [0-9]+% of [0-9]+ statements, [0-9]+ missed\.'
+out="$(prek run .:pytest --all-files 2>&1)"
+if ! grep -q 'did not match any hooks' <<<"${out}"; then
+    rows="$(grep -E '^[[:space:]]*TOTAL[[:space:]]' <<<"${out}")"
+    read -r _ statements missed percent _ <<<"${rows##*$'\n'}"
+    if [[ ! "${statements:-}" =~ ^[0-9]+$ || ! "${missed:-}" =~ ^[0-9]+$ || ! "${percent:-}" =~ ^[0-9]+%$ ]]; then
+        printf 'hh-metrics: no coverage total in the output of prek run .:pytest:\n%s\n' "${out}" >&2
+        exit 1
+    fi
+    cov_now="Metrics: coverage ${percent} of ${statements} statements, ${missed} missed."
+fi
+
+# Coverage through the project's vitest hook, when it has one (the TypeScript
+# pack). The Statements row of Vitest's text-summary report gives the
+# percentage, the statements covered and the total.
+vcov_now=""
+vcov_pattern='Metrics: Vitest coverage [0-9.]+% of [0-9]+ statements, [0-9]+ missed\.'
+out="$(prek run .:vitest --all-files 2>&1)"
+if ! grep -q 'did not match any hooks' <<<"${out}"; then
+    row="$(grep -E '^[[:space:]]*Statements[[:space:]]*:' <<<"${out}")"
+    if [[ ! "${row##*$'\n'}" =~ :[[:space:]]*([0-9.]+%)[[:space:]]*\([[:space:]]*([0-9]+)/([0-9]+)[[:space:]]*\) ]]; then
+        printf 'hh-metrics: no coverage total in the output of prek run .:vitest:\n%s\n' "${out}" >&2
+        exit 1
+    fi
+    vpercent="${BASH_REMATCH[1]}"
+    vcovered="${BASH_REMATCH[2]}"
+    vtotal="${BASH_REMATCH[3]}"
+    vcov_now="Metrics: Vitest coverage ${vpercent} of ${vtotal} statements, $((vtotal - vcovered)) missed."
+fi
+
+# In a fork, the copies upstream's code does not have, as hh-clones lists them,
+# and the coverage of the lines changed since upstream's code: the fork's tests,
+# run by its own `npm test` under c8, which collects Node's coverage from any
+# Node command, read by diff-cover against that commit. Whole-file coverage
+# would mostly measure upstream's lines (diary decision 2026-11-14: copies in a
+# fork counted against upstream's release) (diary decision 2026-11-14: coverage
+# in a fork counted on its own changed lines). Both tools are pinned here.
+here="$(dirname "$0")"
+fork_dup_now=""
+fork_dup_pattern="Metrics: the fork's own duplication [0-9]+ sets from [0-9]+ clones\\."
+fork_cov_now=""
+fork_cov_pattern="Metrics: the fork's changed lines [0-9]+% covered, [0-9]+ of [0-9]+ missed\\."
+base="$("${here}/hh-upstream-base")" || exit 1
+if [[ -n "${base}" ]]; then
+    out="$("${here}/hh-clones" --no-tests 2>&1)" || {
+        printf 'hh-metrics: hh-clones failed:\n%s\n' "${out}" >&2
+        exit 1
+    }
+    if [[ ! "${out}" =~ ([0-9]+)\ sets\ from\ ([0-9]+)\ clones ]]; then
+        printf 'hh-metrics: no set count in the output of hh-clones:\n%s\n' "${out}" >&2
+        exit 1
+    fi
+    fork_dup_now="Metrics: the fork's own duplication ${BASH_REMATCH[1]} sets from ${BASH_REMATCH[2]} clones."
+    if [[ -f package.json ]] && jq -e '.scripts.test' package.json >/dev/null; then
+        work="$(mktemp -d "${TMPDIR:-/tmp}/hh-metrics.XXXXXX")" || exit 1
+        trap 'rm -rf -- "${work:?}"' EXIT
+        if ! out="$(npm_config_cache="${TMPDIR:-/tmp}/hh-rules-npm" npx -y c8@10.1.3 \
+            --reporter=lcovonly --report-dir "${work}" --temp-directory "${work}/raw" \
+            npm test 2>&1)"; then
+            printf 'hh-metrics: the tests failed under c8:\n%s\n' "${out}" >&2
+            exit 1
+        fi
+        if ! out="$(UV_TOOL_DIR="${TMPDIR:-/tmp}/hh-rules-uv" uvx --from diff-cover==9.7.2 \
+            diff-cover "${work}/lcov.info" --compare-branch="${base}" 2>&1)"; then
+            printf 'hh-metrics: diff-cover failed:\n%s\n' "${out}" >&2
+            exit 1
+        fi
+        total_lines="$(sed -nE 's/^Total: +([0-9]+) lines$/\1/p' <<<"${out}")"
+        missing="$(sed -nE 's/^Missing: +([0-9]+) lines$/\1/p' <<<"${out}")"
+        covered="$(sed -nE 's/^Coverage: +([0-9]+)%$/\1/p' <<<"${out}")"
+        if [[ ! "${total_lines}" =~ ^[0-9]+$ || ! "${missing}" =~ ^[0-9]+$ || ! "${covered}" =~ ^[0-9]+$ ]]; then
+            printf 'hh-metrics: no totals in the output of diff-cover:\n%s\n' "${out}" >&2
+            exit 1
+        fi
+        fork_cov_now="Metrics: the fork's changed lines ${covered}% covered, ${missing} of ${total_lines} missed."
+    fi
+fi
+
+# The diary files sort by date, so the last match of each kind is the newest.
+shopt -s nullglob
+diary=(diary/*.md)
+flat=""
+if ((${#diary[@]} > 0)); then
+    flat="$(cat "${diary[@]}")"
+    flat="$(tr -s '[:space:]' ' ' <<<"${flat}")"
+fi
+
+# Prints a metric's line and its change since the last one in the diary.
+report() {
+    local now="$1" pattern="$2" last
+    last="$(grep -oE "${pattern}" <<<"${flat}")"
+    last="${last##*$'\n'}"
+    echo "${now}"
+    if [[ -z "${last}" ]]; then
+        echo "Change: no earlier figures in the diary."
+    elif [[ "${last}" == "${now}" ]]; then
+        echo "Change: none since the last figures in the diary."
+    else
+        echo "Change: was ${last#Metrics: }"
+    fi
+}
+
+report "${dup_now}" "${dup_pattern}"
+# The exclusions are printed with the figure every time, so none is hidden.
+# jscpd-run sits beside this script, in bin/ or .hh/shared/.
+excluded="$("${here}/jscpd-run" --exclusions)" || exit 1
+echo "Excluded from duplication: ${excluded:-none}"
+if [[ -n "${cov_now}" ]]; then
+    report "${cov_now}" "${cov_pattern}"
+fi
+if [[ -n "${vcov_now}" ]]; then
+    report "${vcov_now}" "${vcov_pattern}"
+fi
+if [[ -n "${fork_dup_now}" ]]; then
+    report "${fork_dup_now}" "${fork_dup_pattern}"
+fi
+if [[ -n "${fork_cov_now}" ]]; then
+    report "${fork_cov_now}" "${fork_cov_pattern}"
+fi

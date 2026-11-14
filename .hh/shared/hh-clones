@@ -1,0 +1,802 @@
+#!/usr/bin/env python3
+"""List a project's duplicated code as sets of copies, largest saving first.
+
+jscpd reports each clone as a pair of places. A block copied to five places
+comes out as four pairs, and the ranges of two pairs over the same copy can
+differ by a line or two. This joins the pairs into sets: two places are in one
+set when a clone pairs them or when their ranges overlap in one file. Each set
+is ranked by the lines a fix would remove, every copy's lines but the longest
+one's, which is (copies - 1) x length when the copies are the same size.
+
+Each set gets the case that decides its fix:
+
+- mainline: no copy is in a test file;
+- test: every copy is in a test file;
+- test-and-mainline: a test copies code from the project's own source;
+- prose: every copy is in Markdown or plain text.
+
+Test files are named by --test globs, matched against paths from the project
+root, such as `tests/**` or `**/*.test.ts`. A project without tests says so
+with --no-tests, so a forgotten --test cannot silently file tests as mainline.
+
+It runs jscpd as the commit check does: through `prek exec` in the jscpd
+hook's environment, at the version prek.toml pins, through jscpd-run beside
+this script, which applies the project's .jscpd.jsonc. Arguments after `--`
+go to jscpd, so a re-check after a fix can repeat the flags that found a set.
+
+With --since REF it lists only the new sets: those with a clone that the code
+at REF does not have, by jscpd's comparison with a baseline that jscpd-run
+builds from that commit's tree. The wrap
+uses it with the commit the last wrap started from.
+
+In a fork, a project with an `upstream` remote, only the fork's own copies are
+listed, with or without --since: those with a clone that upstream's code, where
+the branch last met it as hh-upstream-base beside this script finds it, does
+not have. Upstream's copies are upstream's to keep or remove, and a merge
+would otherwise bring each of its new ones into the plan (diary decision
+2026-11-14: copies in a fork counted against upstream's release). --similar
+lists every pair, upstream's too.
+
+With --similar it lists pairs of functions that may do the same job without
+being copies, for Claude to read, instead of the sets. Two jscpd checks find
+them, and each finds pairs the other misses: the shape check (--similarity),
+which compares the syntax of whole functions, within a file too, at a loose
+bar; and the semantic check (--semantic), a code-embedding model that pairs
+look-alikes across files only. Without the model downloaded, the semantic
+check is skipped and the report says so. With --since as well, it lists only
+the pairs the code at REF lacks, by the same comparison.
+
+A pair already judged is skipped: .jscpd-judged.toml, at the project root,
+records each verdict with the scores the pair had then. A function is named by
+its file, its first line, and which occurrence of that line in the file it is,
+since jscpd reports no function names and line numbers move with every edit.
+Both checks give the same score on unchanged code, so a recorded pair is listed
+again only when a check's score has risen more than MARGIN above the recorded
+one, or a check that did not find it then finds it now; a rise is listed with
+--since too, since jscpd does not call such a pair new. Each pair listed comes
+with a block for the record, its verdict and reason left blank to fill in.
+
+A set kept with the operator's agreement is skipped too: the record holds it
+as a [[set]] entry naming each copy by its file and a digest of its text, so
+it stays skipped however its lines move, and is listed again once any copy's
+text changes, since the copies have then begun to differ. Each set listed
+comes with a block for the record, like a pair's.
+
+Usage: hh-clones (--test GLOB... | --no-tests) [--since REF] [--similar]
+[-- JSCPD_ARGS...], run from the project root. Prints the sets or pairs and
+exits 0, or exits 2 when it cannot run, as when REF is not a commit or the
+record cannot be read.
+"""
+
+import argparse
+import hashlib
+import json
+import shutil
+import subprocess
+import sys
+import tempfile
+import tomllib
+from collections.abc import Iterable, Sequence
+from dataclasses import dataclass, replace
+from pathlib import Path, PurePosixPath
+from typing import cast
+
+SUMMARY = "List duplicated code as sets of copies, largest saving first."
+EXIT_REPORTED = 0
+EXIT_CANNOT_RUN = 2
+
+PROSE_FORMATS = frozenset({"markdown", "txt"})
+# Cases in the order the summary line names them.
+CASES = ("mainline", "test", "test-and-mainline", "prose")
+
+# The shape check's bar. jscpd's default, 0.8, finds edited copies only; 0.4
+# reaches functions that do one job written differently (diary decision
+# 2026-11-13: similar functions only on request).
+SHAPE_ARGS = ("--similarity", "0.4", "--kind", "similar")
+SEMANTIC_ARGS = ("--semantic", "--kind", "semantic")
+# jscpd's message when the semantic check's model is not downloaded.
+MODEL_MISSING = "is not downloaded yet"
+CHECK_NAMES = {"similar": "shape", "semantic": "semantic"}
+# The record of judged similar pairs, at the project root.
+RECORD = Path(".jscpd-judged.toml")
+# What the reader decided: different jobs, both kept, or left to a named task.
+VERDICTS = ("different", "kept", "task")
+# What may be decided of a set of copies: kept, or left to a named task.
+SET_VERDICTS = ("kept", "task")
+# A set is two or more copies.
+MIN_COPIES = 2
+# How far a score may rise above the recorded one before the pair is listed
+# again: above what ordinary edits move a score (diary decision 2026-11-06: a
+# record of judged similar pairs).
+MARGIN = 0.05
+
+
+type SetKey = frozenset[tuple[str, str]]
+
+
+class CannotRunError(Exception):
+    """Raised when jscpd cannot be run or its report cannot be read."""
+
+
+@dataclass(frozen=True, order=True)
+class Place:
+    """A line range in one file, both ends included."""
+
+    file: str
+    start: int
+    end: int
+
+    def lines(self) -> int:
+        """Return how many lines the range covers."""
+        return self.end - self.start + 1
+
+    def __str__(self) -> str:
+        """Return the place as file:start-end."""
+        return f"{self.file}:{self.start}-{self.end}"
+
+
+@dataclass(frozen=True)
+class Clone:
+    """One pair from jscpd's report."""
+
+    first: Place
+    second: Place
+    kind: str
+    format: str
+    new: bool = False
+    similarity: float = 1.0
+
+
+@dataclass(frozen=True, order=True)
+class FunctionKey:
+    """A function named by its file, its first line, and that line's occurrence."""
+
+    file: str
+    line: str
+    occurrence: int = 1
+
+
+@dataclass(frozen=True)
+class Judged:
+    """A recorded verdict on a pair, with the scores the pair had then."""
+
+    verdict: str
+    reason: str
+    scores: tuple[tuple[str, float], ...]
+
+
+@dataclass(frozen=True)
+class Similar:
+    """Two functions one or both checks pair, with each check's score."""
+
+    first: Place
+    second: Place
+    scores: tuple[tuple[str, float], ...]
+    case: str
+    format: str
+    new: bool = False
+    # Why a judged pair is listed again; empty for a pair not judged.
+    again: str = ""
+
+    def found_by_both(self) -> bool:
+        """Say whether both checks paired these functions."""
+        return len(self.scores) > 1
+
+
+@dataclass(frozen=True)
+class CloneSet:
+    """Places that copy each other, with the case that decides their fix."""
+
+    places: tuple[Place, ...]
+    case: str
+    kinds: tuple[str, ...]
+    formats: tuple[str, ...]
+    new: bool = False
+
+    def removable(self) -> int:
+        """Return the lines a fix would remove: all copies but the longest."""
+        sizes = [p.lines() for p in self.places]
+        return sum(sizes) - max(sizes)
+
+
+def place(entry: object) -> Place:
+    """Read a place from one side of a jscpd duplicate."""
+    side = cast("dict[str, object]", entry)
+    name, start, end = side.get("name"), side.get("start"), side.get("end")
+    if not (isinstance(name, str) and isinstance(start, int) and isinstance(end, int)):
+        msg = f"unexpected place in jscpd's report: {side!r}"
+        raise CannotRunError(msg)
+    # jscpd names a file as "<path>:<format>".
+    return Place(name.rpartition(":")[0] or name, start, end)
+
+
+def read_report(text: str) -> list[Clone]:
+    """Read the clones from jscpd's JSON report."""
+    try:
+        report = json.loads(text)
+    except json.JSONDecodeError as e:
+        msg = f"jscpd's report is not JSON: {e}"
+        raise CannotRunError(msg) from e
+    duplicates: object = None
+    if isinstance(report, dict):
+        duplicates = cast("dict[str, object]", report).get("duplicates")
+    if not isinstance(duplicates, list):
+        msg = "jscpd's report has no duplicates list"
+        raise CannotRunError(msg)
+    clones: list[Clone] = []
+    for raw in cast("list[object]", duplicates):
+        d = cast("dict[str, object]", raw)
+        clones.append(
+            Clone(
+                place(d["firstFile"]),
+                place(d["secondFile"]),
+                str(d.get("kind", "exact")),
+                str(d.get("format", "")),
+                d.get("isNew") is True,
+                float(cast("float", d.get("similarity", 1.0))),
+            ),
+        )
+    return clones
+
+
+class Joiner:
+    """Union-find over places."""
+
+    def __init__(self) -> None:
+        """Start with every place in a set of its own."""
+        self.parent: dict[Place, Place] = {}
+
+    def find(self, p: Place) -> Place:
+        """Return the representative of p's set."""
+        self.parent.setdefault(p, p)
+        while self.parent[p] != p:
+            self.parent[p] = self.parent[self.parent[p]]
+            p = self.parent[p]
+        return p
+
+    def join(self, a: Place, b: Place) -> None:
+        """Put a and b in one set."""
+        self.parent[self.find(a)] = self.find(b)
+
+
+def merge_ranges(places: Iterable[Place]) -> list[Place]:
+    """Merge the overlapping ranges in each file into one place each."""
+    merged: list[Place] = []
+    for p in sorted(places):
+        last = merged[-1] if merged else None
+        if last is not None and last.file == p.file and p.start <= last.end:
+            merged[-1] = Place(p.file, last.start, max(last.end, p.end))
+        else:
+            merged.append(p)
+    return merged
+
+
+def is_test(file: str, test_globs: Sequence[str]) -> bool:
+    """Say whether a path from the project root is a test file."""
+    path = PurePosixPath(file)
+    return any(path.full_match(g) for g in test_globs)
+
+
+def case_of(
+    places: Sequence[Place], formats: Iterable[str], tests: Sequence[str]
+) -> str:
+    """Return the case that decides how a set is fixed."""
+    if set(formats) <= PROSE_FORMATS:
+        return "prose"
+    in_tests = [is_test(p.file, tests) for p in places]
+    if all(in_tests):
+        return "test"
+    if any(in_tests):
+        return "test-and-mainline"
+    return "mainline"
+
+
+def group(clones: Sequence[Clone], test_globs: Sequence[str]) -> list[CloneSet]:
+    """Join the pairs into sets of copies, largest saving first."""
+    joiner = Joiner()
+    for c in clones:
+        joiner.join(c.first, c.second)
+    by_file: dict[str, list[Place]] = {}
+    for p in list(joiner.parent):
+        by_file.setdefault(p.file, []).append(p)
+    for places in by_file.values():
+        places.sort()
+        reach = places[0]
+        for p in places[1:]:
+            if p.start <= reach.end:
+                joiner.join(reach, p)
+            if p.end > reach.end:
+                reach = p
+    members: dict[Place, list[Place]] = {}
+    for p in list(joiner.parent):
+        members.setdefault(joiner.find(p), []).append(p)
+    clone_root = {c: joiner.find(c.first) for c in clones}
+    sets: list[CloneSet] = []
+    for root, places in members.items():
+        own = [c for c in clones if clone_root[c] == root]
+        formats = sorted({c.format for c in own})
+        merged = tuple(merge_ranges(places))
+        sets.append(
+            CloneSet(
+                merged,
+                case_of(merged, formats, test_globs),
+                tuple(sorted({c.kind for c in own})),
+                tuple(formats),
+                any(c.new for c in own),
+            ),
+        )
+    sets.sort(key=lambda s: (-s.removable(), -len(s.places), s.places))
+    return sets
+
+
+def overlaps(a: Place, b: Place) -> bool:
+    """Say whether two places share a line in one file."""
+    return a.file == b.file and a.start <= b.end and b.start <= a.end
+
+
+def same_pair(a: Clone, b: Clone) -> bool:
+    """Say whether two pairs join the same two functions, either way round."""
+    return (overlaps(a.first, b.first) and overlaps(a.second, b.second)) or (
+        overlaps(a.first, b.second) and overlaps(a.second, b.first)
+    )
+
+
+def similar_pairs(clones: Sequence[Clone], test_globs: Sequence[str]) -> list[Similar]:
+    """Join the checks' pairs, those found by both first, then by best score."""
+    groups: list[list[Clone]] = []
+    for c in clones:
+        match = next((g for g in groups if same_pair(g[0], c)), None)
+        if match is None:
+            groups.append([c])
+        else:
+            match.append(c)
+    pairs: list[Similar] = []
+    for g in groups:
+        scores = {CHECK_NAMES.get(c.kind, c.kind): c.similarity for c in g}
+        sides = (g[0].first, g[0].second)
+        pairs.append(
+            Similar(
+                *sides,
+                tuple(sorted(scores.items(), key=lambda s: -s[1])),
+                case_of(sides, [g[0].format], test_globs),
+                g[0].format,
+                any(c.new for c in g),
+            ),
+        )
+    pairs.sort(
+        key=lambda p: (not p.found_by_both(), -p.scores[0][1], p.first, p.second)
+    )
+    return pairs
+
+
+def place_lines(p: Place, root: Path) -> list[str] | None:
+    """Return the lines of a place's file, or None when the place cannot be read.
+
+    A place cannot be read when its file cannot, or when its first line is not
+    in the file.
+    """
+    try:
+        lines = (root / p.file).read_text(encoding="utf-8").splitlines()
+    except (OSError, UnicodeDecodeError):
+        return None
+    if not 1 <= p.start <= len(lines):
+        return None
+    return lines
+
+
+def key_of(p: Place, root: Path) -> FunctionKey | None:
+    """Name the function at a place, or None when its file cannot be read."""
+    lines = place_lines(p, root)
+    if lines is None:
+        return None
+    first = lines[p.start - 1].strip()
+    occurrence = sum(line.strip() == first for line in lines[: p.start])
+    return FunctionKey(p.file, first, occurrence)
+
+
+def pair_key(p: Similar, root: Path) -> frozenset[FunctionKey] | None:
+    """Name a pair's two functions, either way round."""
+    first, second = key_of(p.first, root), key_of(p.second, root)
+    if first is None or second is None:
+        return None
+    return frozenset((first, second))
+
+
+def record_error(n: int, what: str) -> CannotRunError:
+    """Describe a bad entry in the record."""
+    return CannotRunError(f"{RECORD}: pair {n}: {what}")
+
+
+def read_key(n: int, raw: object) -> FunctionKey:
+    """Read one function's name from a record entry."""
+    if not isinstance(raw, dict):
+        raise record_error(n, "first and second must be tables")
+    side = cast("dict[str, object]", raw)
+    file, line, occurrence = (
+        side.get("file"),
+        side.get("line"),
+        side.get("occurrence", 1),
+    )
+    if not (isinstance(file, str) and isinstance(line, str)):
+        raise record_error(n, "a function needs a file and a line")
+    if not isinstance(occurrence, int) or occurrence < 1:
+        raise record_error(n, "occurrence must be a whole number from 1")
+    return FunctionKey(file, line, occurrence)
+
+
+def record_entries(text: str, name: str) -> list[object]:
+    """Return the record's entries of one kind, its [[name]] tables."""
+    try:
+        data = tomllib.loads(text)
+    except tomllib.TOMLDecodeError as e:
+        msg = f"{RECORD} is not TOML: {e}"
+        raise CannotRunError(msg) from e
+    entries: object = data.get(name, [])
+    if not isinstance(entries, list):
+        msg = f"{RECORD}: {name} must be an array of tables, [[{name}]]"
+        raise CannotRunError(msg)
+    return cast("list[object]", entries)
+
+
+def read_record(text: str) -> dict[frozenset[FunctionKey], Judged]:
+    """Read the judged pairs from the record's TOML."""
+    record: dict[frozenset[FunctionKey], Judged] = {}
+    for n, raw in enumerate(record_entries(text, "pair"), 1):
+        if not isinstance(raw, dict):
+            raise record_error(n, "not a table")
+        entry = cast("dict[str, object]", raw)
+        verdict, reason, scores = (
+            entry.get(k) for k in ("verdict", "reason", "scores")
+        )
+        if verdict not in VERDICTS:
+            raise record_error(n, f"verdict must be one of {', '.join(VERDICTS)}")
+        if not isinstance(reason, str) or not reason.strip():
+            raise record_error(n, "a reason is needed")
+        if not isinstance(scores, dict) or not scores:
+            raise record_error(n, "scores must name each check's score")
+        named = cast("dict[str, object]", scores)
+        if not all(isinstance(v, int | float) for v in named.values()):
+            raise record_error(n, "each score must be a number")
+        key = frozenset(
+            (read_key(n, entry.get("first")), read_key(n, entry.get("second")))
+        )
+        record[key] = Judged(
+            str(verdict),
+            reason,
+            tuple((k, float(cast("float", v))) for k, v in named.items()),
+        )
+    return record
+
+
+def text_digest(p: Place, root: Path) -> str | None:
+    """Return a digest of the place's lines, or None when they cannot be read."""
+    lines = place_lines(p, root)
+    if lines is None or not p.start <= p.end <= len(lines):
+        return None
+    text = "\n".join(lines[p.start - 1 : p.end])
+    return "sha256:" + hashlib.sha256(text.encode()).hexdigest()
+
+
+def set_key(s: CloneSet, root: Path) -> SetKey | None:
+    """Name a set by each copy's file and text, or None when one cannot be read."""
+    copies: set[tuple[str, str]] = set()
+    for p in s.places:
+        digest = text_digest(p, root)
+        if digest is None:
+            return None
+        copies.add((p.file, digest))
+    return frozenset(copies)
+
+
+def read_sets(text: str) -> set[SetKey]:
+    """Read the sets kept or left to a task from the record's TOML."""
+    record: set[SetKey] = set()
+    for n, raw in enumerate(record_entries(text, "set"), 1):
+        where = f"{RECORD}: set {n}"
+        if not isinstance(raw, dict):
+            msg = f"{where}: not a table"
+            raise CannotRunError(msg)
+        entry = cast("dict[str, object]", raw)
+        verdict, reason, copies = (
+            entry.get(k) for k in ("verdict", "reason", "copies")
+        )
+        if verdict not in SET_VERDICTS:
+            msg = f"{where}: verdict must be one of {', '.join(SET_VERDICTS)}"
+            raise CannotRunError(msg)
+        if not isinstance(reason, str) or not reason.strip():
+            msg = f"{where}: a reason is needed"
+            raise CannotRunError(msg)
+        if (
+            not isinstance(copies, list)
+            or len(cast("list[object]", copies)) < MIN_COPIES
+        ):
+            msg = f"{where}: copies must list two or more copies"
+            raise CannotRunError(msg)
+        key: set[tuple[str, str]] = set()
+        for c in cast("list[object]", copies):
+            copy = cast("dict[str, object]", c) if isinstance(c, dict) else {}
+            file, digest = copy.get("file"), copy.get("text")
+            if not (isinstance(file, str) and isinstance(digest, str)):
+                msg = f"{where}: each copy needs a file and a text digest"
+                raise CannotRunError(msg)
+            key.add((file, digest))
+        record.add(frozenset(key))
+    return record
+
+
+def set_block(s: CloneSet, root: Path) -> list[str]:
+    """Return the record entry for a set, its verdict and reason blank."""
+    out = ["  [[set]]", '  verdict = ""', '  reason = ""', "  copies = ["]
+    for p in s.places:
+        digest = text_digest(p, root)
+        if digest is None:
+            return ["  (no record entry: a file could not be read)"]
+        out.append(
+            f"    {{ file = {toml_string(p.file)}, text = {toml_string(digest)} }},"
+        )
+    out.append("  ]")
+    return out
+
+
+def listed_again(p: Similar, judged: Judged) -> str:
+    """Say why a judged pair is listed again, or "" when it stays skipped."""
+    then = dict(judged.scores)
+    for check, score in p.scores:
+        if check not in then:
+            return f"judged {judged.verdict}; now found by the {check} check too"
+        if score > then[check] + MARGIN:
+            return (
+                f"judged {judged.verdict}; {check} score rose from "
+                f"{then[check]:.3f} to {score:.3f}"
+            )
+    return ""
+
+
+def apply_record(
+    pairs: Sequence[Similar],
+    record: dict[frozenset[FunctionKey], Judged],
+    root: Path,
+) -> tuple[list[Similar], int]:
+    """Drop the judged pairs that stay skipped; return the rest and the count."""
+    kept: list[Similar] = []
+    for p in pairs:
+        key = pair_key(p, root)
+        judged = record.get(key) if key is not None else None
+        if judged is None:
+            kept.append(p)
+            continue
+        again = listed_again(p, judged)
+        if again:
+            kept.append(replace(p, again=again))
+    return kept, len(pairs) - len(kept)
+
+
+def toml_string(text: str) -> str:
+    """Quote text as a TOML basic string; JSON's escapes are TOML's."""
+    return json.dumps(text, ensure_ascii=False)
+
+
+def record_block(p: Similar, root: Path) -> list[str]:
+    """Return the record entry for a pair, its verdict and reason blank."""
+    first, second = key_of(p.first, root), key_of(p.second, root)
+    if first is None or second is None:
+        return ["  (no record entry: a file could not be read)"]
+    scores = ", ".join(f"{name} = {score}" for name, score in sorted(p.scores))
+    out = [
+        "  [[pair]]",
+        '  verdict = ""',
+        '  reason = ""',
+        f"  scores = {{ {scores} }}",
+    ]
+    for side, k in (("first", first), ("second", second)):
+        out.append(
+            f"  {side} = {{ file = {toml_string(k.file)}, "
+            f"line = {toml_string(k.line)}, occurrence = {k.occurrence} }}"
+        )
+    return out
+
+
+def render_similar(
+    pairs: Sequence[Similar],
+    skipped: str | None,
+    since: str | None = None,
+    *,
+    judged: int = 0,
+    root: Path | None = None,
+) -> list[str]:
+    """Return the pairs as lines: a summary, then each pair with its block."""
+    counts = {case: sum(p.case == case for p in pairs) for case in CASES[:3]}
+    summary = ", ".join(f"{case} {n}" for case, n in counts.items())
+    both = sum(p.found_by_both() for p in pairs)
+    what = "similar pairs" if since is None else f"new similar pairs since {since}"
+    out = [f"{len(pairs)} {what}, {both} found by both checks: {summary}"]
+    if judged:
+        out.append(f"{judged} judged pairs skipped, as recorded in {RECORD}")
+    if skipped is not None:
+        out.append(f"semantic check not run: {skipped}")
+    for p in pairs:
+        scores = ", ".join(f"{name} {score:.2f}" for name, score in p.scores)
+        out.extend(["", f"{scores}, {p.case}, {p.format}", f"  {p.first}"])
+        out.append(f"  {p.second}")
+        if p.again:
+            out.append(f"  listed again: {p.again}")
+        if root is not None:
+            out.extend(record_block(p, root))
+    return out
+
+
+def run_similar(
+    jscpd_args: Sequence[str], since: str | None = None
+) -> tuple[list[Clone], str | None]:
+    """Run both checks; return their pairs and why the semantic one was skipped."""
+    clones = read_report(run_jscpd([*SHAPE_ARGS, *jscpd_args], since))
+    try:
+        clones += read_report(run_jscpd([*SEMANTIC_ARGS, *jscpd_args], since))
+    except CannotRunError as e:
+        if MODEL_MISSING not in str(e):
+            raise
+        return clones, (
+            "its model is not downloaded; run "
+            "`prek exec jscpd -- jscpd --semantic-download` once, outside the "
+            "sandbox"
+        )
+    return clones, None
+
+
+def render(
+    sets: Sequence[CloneSet],
+    clones: int,
+    since: str | None = None,
+    *,
+    kept: int = 0,
+    root: Path | None = None,
+) -> list[str]:
+    """Return the report as lines: a summary, then each set with its block."""
+    counts = {case: sum(s.case == case for s in sets) for case in CASES}
+    summary = ", ".join(f"{case} {n}" for case, n in counts.items())
+    what = "sets" if since is None else f"new sets since {since}"
+    out = [f"{len(sets)} {what} from {clones} clones: {summary}"]
+    if kept:
+        out.append(f"{kept} kept sets skipped, as recorded in {RECORD}")
+    for s in sets:
+        out.append("")
+        out.append(
+            f"removes {s.removable()} lines, {len(s.places)} copies, {s.case}, "
+            f"{'/'.join(s.kinds)}, {'/'.join(s.formats)}",
+        )
+        out.extend(f"  {p}" for p in s.places)
+        if root is not None:
+            out.extend(set_block(s, root))
+    return out
+
+
+def run_jscpd(jscpd_args: Sequence[str], since: str | None = None) -> str:
+    """Run jscpd as the commit check does, returning its JSON report.
+
+    With `since`, jscpd-run marks the clones that commit lacks as new.
+    """
+    prek = shutil.which("prek")
+    if prek is None:
+        msg = "prek is not on PATH"
+        raise CannotRunError(msg)
+    jscpd_run = Path(__file__).resolve().parent / "jscpd-run"
+    if not jscpd_run.is_file():
+        msg = f"no jscpd-run beside this script: {jscpd_run}"
+        raise CannotRunError(msg)
+    with tempfile.TemporaryDirectory() as out:
+        compare = [] if since is None else ["--new-since", since]
+        prek_exec = [prek, "exec", "jscpd", "--", str(jscpd_run), *compare, "."]
+        json_report = ["--silent", "--no-tips", "--reporters", "json", "--output", out]
+        command = [*prek_exec, *json_report, *jscpd_args]
+        done = subprocess.run(command, capture_output=True, text=True, check=False)
+        report = Path(out) / "jscpd-report.json"
+        if done.returncode != 0 or not report.is_file():
+            msg = (
+                f"jscpd exited {done.returncode} without a report:\n"
+                f"{done.stdout}{done.stderr}"
+            )
+            raise CannotRunError(msg)
+        return report.read_text(encoding="utf-8")
+
+
+def upstream_base() -> str | None:
+    """Return where a fork's branch last met upstream, or None outside a fork."""
+    script = Path(__file__).resolve().parent / "hh-upstream-base"
+    if not script.is_file():
+        msg = f"no hh-upstream-base beside this script: {script}"
+        raise CannotRunError(msg)
+    done = subprocess.run([str(script)], capture_output=True, text=True, check=False)
+    if done.returncode != 0:
+        msg = f"hh-upstream-base exited {done.returncode}:\n{done.stderr}"
+        raise CannotRunError(msg)
+    return done.stdout.strip() or None
+
+
+def forks_own(
+    clones: Sequence[Clone], jscpd_args: Sequence[str], base: str
+) -> list[Clone]:
+    """Keep the clones that upstream's code at `base` does not have."""
+    against_upstream = read_report(run_jscpd(jscpd_args, base))
+    new = {(c.first, c.second) for c in against_upstream if c.new}
+    return [c for c in clones if (c.first, c.second) in new]
+
+
+def parse_args(argv: Sequence[str]) -> argparse.Namespace:
+    """Read the command line; the jscpd arguments are those after `--`."""
+    own, jscpd = list(argv), []
+    if "--" in own:
+        cut = own.index("--")
+        own, jscpd = own[:cut], own[cut + 1 :]
+    parser = argparse.ArgumentParser(prog="hh-clones", description=SUMMARY)
+    tests = parser.add_mutually_exclusive_group(required=True)
+    tests.add_argument("--test", action="append", default=[], metavar="GLOB")
+    tests.add_argument("--no-tests", action="store_true")
+    parser.add_argument("--since", metavar="REF")
+    parser.add_argument("--similar", action="store_true")
+    args = parser.parse_args(own)
+    args.jscpd = jscpd
+    return args
+
+
+def main(argv: Sequence[str]) -> int:
+    """Run jscpd, group its clones and print them."""
+    args = parse_args(argv[1:])
+    since = cast("str | None", args.since)
+    jscpd_args = cast("list[str]", args.jscpd)
+    if args.similar:
+        try:
+            clones, skipped = run_similar(jscpd_args, since)
+        except CannotRunError as e:
+            print(f"hh-clones: {e}", file=sys.stderr)
+            return EXIT_CANNOT_RUN
+        root = Path.cwd()
+        try:
+            record = read_record(
+                (root / RECORD).read_text(encoding="utf-8")
+                if (root / RECORD).is_file()
+                else ""
+            )
+        except CannotRunError as e:
+            print(f"hh-clones: {e}", file=sys.stderr)
+            return EXIT_CANNOT_RUN
+        pairs = similar_pairs(clones, cast("list[str]", args.test))
+        pairs, judged = apply_record(pairs, record, root)
+        if since is not None:
+            pairs = [p for p in pairs if p.new or p.again]
+        lines = render_similar(pairs, skipped, since, judged=judged, root=root)
+        print("\n".join(lines))
+        return EXIT_REPORTED
+    try:
+        clones = read_report(run_jscpd(jscpd_args, since))
+        base = upstream_base()
+        if base is not None:
+            upstream_count = len(clones)
+            clones = forks_own(clones, jscpd_args, base)
+            print(
+                f"In a fork: {upstream_count - len(clones)} of {upstream_count} "
+                f"clones are upstream's, at {base[:12]}, and left out.",
+            )
+    except CannotRunError as e:
+        print(f"hh-clones: {e}", file=sys.stderr)
+        return EXIT_CANNOT_RUN
+    root = Path.cwd()
+    try:
+        recorded = read_sets(
+            (root / RECORD).read_text(encoding="utf-8")
+            if (root / RECORD).is_file()
+            else ""
+        )
+    except CannotRunError as e:
+        print(f"hh-clones: {e}", file=sys.stderr)
+        return EXIT_CANNOT_RUN
+    found = group(clones, cast("list[str]", args.test))
+    sets = [s for s in found if set_key(s, root) not in recorded]
+    kept = len(found) - len(sets)
+    if since is not None:
+        sets = [s for s in sets if s.new]
+    print("\n".join(render(sets, len(clones), since, kept=kept, root=root)))
+    return EXIT_REPORTED
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

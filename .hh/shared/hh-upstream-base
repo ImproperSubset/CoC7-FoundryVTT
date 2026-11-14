@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# Prints the commit where a fork's branch last met upstream: of the merge bases
+# of HEAD with each branch fetched from the `upstream` remote, the one with the
+# most history behind it. In a fork, a copy or a changed line that this commit
+# already has is upstream's, so hh-clones and hh-metrics count only what is new
+# since it (diary decision 2026-11-14: copies in a fork counted against
+# upstream's release) (diary decision 2026-11-14: coverage in a fork counted on
+# its own changed lines). Prints nothing for a project with no `upstream`
+# remote, and fails for one whose upstream branches are not fetched.
+set -uo pipefail
+
+git remote get-url upstream >/dev/null 2>&1 || exit 0
+best=""
+best_count=-1
+refs="$(git for-each-ref --format='%(refname)' refs/remotes/upstream/)" || exit 1
+while IFS= read -r ref; do
+    [[ -n "${ref}" ]] || continue
+    base="$(git merge-base HEAD "${ref}")" || continue
+    count="$(git rev-list --count "${base}")" || exit 1
+    if ((count > best_count)); then
+        best="${base}"
+        best_count="${count}"
+    fi
+done <<<"${refs}"
+if [[ -z "${best}" ]]; then
+    echo "hh-upstream-base: no branch of the upstream remote meets HEAD; run git fetch upstream" >&2
+    exit 1
+fi
+echo "${best}"

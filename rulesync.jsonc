@@ -1,0 +1,19 @@
+{
+  "targets": ["claudecode"],
+  "features": ["rules", "skills"],
+  "sources": [
+    {
+      "source": "https://github.com/ImproperSubset/hh-rules",
+      "transport": "git",
+      "ref": "v0.24.0",
+      "rules": ["principles", "diary", "glossary", "zsh", "sandbox"],
+      "skills": ["hh-dedupe", "hh-drift", "hh-wrap"]
+    },
+    {
+      "source": "https://github.com/kucherenko/jscpd",
+      "transport": "git",
+      "ref": "v5.4.1",
+      "skills": ["dry-refactoring", "jscpd"]
+    }
+  ]
+}

@@ -1,0 +1,100 @@
+# Copied to a project's root as prek.toml; activate in each clone with `prek install`.
+#
+# Every hook in this file changes no file and holds no file to our standards,
+# so it is safe on files of any origin, such as a fork's upstream files: a fork
+# installs this file and fork.toml, every other project this file and
+# format.toml. A hook that formats a file, or holds it to a style or policy of
+# ours, goes in format.toml instead.
+#
+# A file is checked in the repository it calls home. Everything under
+# .hh/shared/, and each pinned skill in .claude/skills/hh-*/, comes from
+# hh-rules and is checked there, with the exceptions agreed for it; jscpd's
+# own skills, .claude/skills/dry-refactoring/ and .claude/skills/jscpd/, come
+# from jscpd. A project's copy is replaced on each update, so a fix made in the
+# project would not last.
+# rulesync also rewrites the skills as it generates them, in a form mdformat
+# would change. The format, lint, duplication and disabling-comment checks
+# therefore skip them; gitleaks and reuse, which check the project's own
+# secrets and labels, do not.
+
+[[repos]]
+repo = "https://github.com/gitleaks/gitleaks"
+rev = "v8.30.1"
+hooks = [
+  { id = "gitleaks" },
+  # The identity check: gitleaks again, with rules from the committer's own
+  # ~/.config/hh-rules/identity.toml, which names no one here. It takes the
+  # staged files, so an `exclude` agreed for a project holds file by file.
+  { id = "gitleaks", alias = "identity", name = "No committer identity", entry = ".hh/shared/identity-check.sh", pass_filenames = true },
+]
+
+# Diary decisions and the citations of them, in docs and code comments alike,
+# so it runs on every commit; the script is copied to .hh/shared/ by /hh-rules
+# from the project's tag. hh-drift-carried holds every decision in force to a
+# citation or a CC_NO_DOC line; /hh-rules adds it once it passes.
+[[repos]]
+repo = "local"
+
+[[repos.hooks]]
+id = "hh-drift"
+name = "Check diary decisions and citations"
+language = "system"
+entry = ".hh/shared/hh-drift"
+always_run = true
+pass_filenames = false
+
+[[repos.hooks]]
+id = "hh-drift-carried"
+name = "Every diary decision cited or marked docless"
+language = "system"
+entry = ".hh/shared/hh-drift --carried"
+always_run = true
+pass_filenames = false
+
+# Duplication: jscpd over the whole tracked tree at every commit, all
+# languages, printing its figures and marking as new each clone that HEAD does
+# not have. It never fails a commit, because metrics are reported as numbers
+# and never held to a threshold; the wrap puts each new clone in the plan. Its
+# exclusions are in .jscpd.jsonc, each with its reason, and
+# .hh/shared/jscpd-run strips that file's comments for jscpd, which reads only
+# strict JSON; it is pinned here and installed by prek from PyPI. By default
+# jscpd skips what .gitignore lists and does not follow symlinks.
+[[repos]]
+repo = "local"
+
+[[repos.hooks]]
+id = "jscpd"
+name = "Check for duplicated code"
+language = "python"
+additional_dependencies = ["jscpd==5.4.1"]
+entry = ".hh/shared/jscpd-run --new-since-head ."
+pass_filenames = false
+always_run = true
+verbose = true
+
+# A fork's own Markdown, which a fork installs after base.toml in place of
+# format.toml: its records only, the diary, the plan, CLAUDE.md, the rules
+# and Claude's reference docs. Every other file is upstream's or in upstream's
+# style, and keeps it, so these hooks are limited by `files` to those paths
+# and a new formatter reaches a fork only by being added here. The pins equal
+# format.toml's, which hh-rules' own commit check keeps so.
+[[repos]]
+repo = "https://github.com/hukkin/mdformat"
+rev = "1.0.0"
+hooks = [{ id = "mdformat", files = "^(diary/|PLAN\\.md$|CLAUDE\\.md$|\\.claude/rules/|\\.hh/docs/)", additional_dependencies = ["mdformat-gfm==1.0.0", "mdformat-frontmatter==2.1.2"] }]
+
+[[repos]]
+repo = "https://github.com/DavidAnson/markdownlint-cli2"
+rev = "v0.23.3"
+hooks = [{ id = "markdownlint-cli2", files = "^(diary/|PLAN\\.md$|CLAUDE\\.md$|\\.claude/rules/|\\.hh/docs/)" }]
+
+[[repos]]
+repo = "local"
+
+[[repos.hooks]]
+id = "no-disable-markdownlint"
+name = "No markdownlint disabling comments"
+language = "pygrep"
+entry = "<!--\\s*markdownlint-(disable|enable|capture|restore|configure-file)"
+types = ["markdown"]
+files = "^(diary/|PLAN\\.md$|CLAUDE\\.md$|\\.claude/rules/|\\.hh/docs/)"

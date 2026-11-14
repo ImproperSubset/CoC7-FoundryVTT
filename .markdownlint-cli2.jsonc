@@ -1,0 +1,10 @@
+// Copied to a project's root by /hh-rules. Every rule is on. Line length
+// skips code blocks, whose language decides their width; tables, whose rows
+// cannot wrap; and headings, which are one line by grammar. Prose stays at
+// mdformat's 80.
+{
+  "config": {
+    "MD013": { "code_blocks": false, "tables": false, "headings": false },
+  },
+  "ignores": ["node_modules", ".venv"],
+}

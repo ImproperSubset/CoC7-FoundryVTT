@@ -1,0 +1,9 @@
+# Copied by /hh-rules to a project's .hh/shared/REUSE.toml. Every file in
+# .hh/shared/ comes from hh-rules, so the folder carries hh-rules' license
+# whatever the project's own is; reuse lint takes the closest REUSE.toml.
+version = 1
+
+[[annotations]]
+path = "**"
+SPDX-FileCopyrightText = "2026 ImproperSubset"
+SPDX-License-Identifier = "MIT"

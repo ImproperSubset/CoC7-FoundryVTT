@@ -1,0 +1,8 @@
+# Copied to a project's root by /hh-rules. Naming the extensions makes a
+# missing plugin an error: without them mdformat collapses a GFM table to one
+# line and still exits 0.
+wrap = 80
+extensions = ["gfm", "frontmatter"]
+
+[plugin.tables]
+compact_tables = true
