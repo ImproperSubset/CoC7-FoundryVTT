@@ -22,6 +22,10 @@
 
 ## Releasing
 
+A release is made only when the operator asks for one, once the change has been
+tried on the test server, a local Foundry runtime running a build of the branch
+(diary decision 2026-11-16: releases only when asked, after a trial).
+
 Release with:
 
 ```sh
