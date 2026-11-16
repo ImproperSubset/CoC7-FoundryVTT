@@ -13,7 +13,10 @@ paths:
   span several days stay as they are.
 
 - The diary is append-only. Earlier entries are never edited; a correction is a
-  new entry.
+  new entry. The one exception is an entry not yet pushed that would publish a
+  secret or the operator's infrastructure: it is edited before the push, since a
+  correction would only publish what it corrects (diary decision 2026-11-16:
+  unpushed diary entries cleaned before publishing).
 
 - The diary is the home for history and statistics: how something came to be,
   what changed and when, counts, measurements, test results, timings. They go
@@ -63,19 +66,23 @@ paths:
   of an earlier one, such as an exception to it, restates what still stands of
   the earlier one along with the change, and replaces it, so every decision in
   force reads whole and a doc line cites only that one (diary decision
-  2026-11-02: partial overrides in the diary). A topic contains no parentheses,
-  because docs cite a decision as `(diary decision YYYY-MM-DD: <topic>)`. A
-  topic is renamed by a new decision entry that restates the decision under the
-  new topic, with a `Replaces` line naming the old one (diary decision
-  2026-11-01: renaming a decision topic). The marker appears only in decision
-  headings, so `command grep -n "^## .*CC_DIARY_DECISION" diary/*.md` is the
-  index of decisions, oldest first, since the shell sorts the file names and
-  they are dates, and GNU grep keeps that order; `grep -r` and the Bash tool's
-  own `grep` function do not. Mention the marker nowhere else in the diary. The
-  plan's marker for a provisional decision never appears in the diary: the
-  commit that moves one here writes it as a decision heading, and `hh-drift`
-  reports the marker left behind (diary decision 2026-11-13: provisional
-  decisions in the plan, and what the wrap fixes there).
+  2026-11-02: partial overrides in the diary). A decision that moves a set of
+  files states the move once, naming the old place and listing the decisions in
+  force that name it; those decisions stay in force, read with the new place,
+  and are not restated (diary decision 2026-11-14: a move of files stated once).
+  A topic contains no parentheses, because docs cite a decision as
+  `(diary decision YYYY-MM-DD: <topic>)`. A topic is renamed by a new decision
+  entry that restates the decision under the new topic, with a `Replaces` line
+  naming the old one (diary decision 2026-11-01: renaming a decision topic). The
+  marker appears only in decision headings, so
+  `command grep -n "^## .*CC_DIARY_DECISION" diary/*.md` is the index of
+  decisions, oldest first, since the shell sorts the file names and they are
+  dates, and GNU grep keeps that order; `grep -r` and the Bash tool's own `grep`
+  function do not. Mention the marker nowhere else in the diary. The plan's
+  marker for a provisional decision never appears in the diary: the commit that
+  moves one here writes it as a decision heading, and `hh-drift` reports the
+  marker left behind (diary decision 2026-11-13: provisional decisions in the
+  plan, and what the wrap fixes there).
 
 - Every decision in force is carried: a doc line, or a code comment, cites it,
   or its entry ends with a `CC_NO_DOC` line giving the reason none does, such as

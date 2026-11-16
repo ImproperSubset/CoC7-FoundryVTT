@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Commit check: refuses a commit that adds the identity of whoever commits,
-# such as their name, username or email, using gitleaks rules kept in
+# such as their name, username or email, or their infrastructure, such as
+# hostnames, domains and addresses, using gitleaks rules kept in
 # ~/.config/hh-rules/identity.toml. The rules live outside every repository,
 # because a repository that held them would publish what they protect. A
 # missing file fails the commit rather than passing it silently; a file with no

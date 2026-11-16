@@ -277,7 +277,7 @@ conversation; anything that needs a choice is for the operator.
   question; or, for each, that it found none.
 - If the branch has commits its upstream lacks, and the project has no standing
   permission to push, end the report by naming how many and asking once whether
-  to push, after the check for secrets and infrastructure details the principles
-  require. The wrap does not push on its own, and an unanswered question is not
+  to push; a push that publishes, as the principles define it, is raised as they
+  say. The wrap does not push on its own, and an unanswered question is not
   raised again before the next wrap (diary decision 2026-11-08: when a push is
   asked about).

@@ -370,19 +370,27 @@ How Claude and the operator work together on this project.
 
 - Local commits are free.
 - A push needs the operator's go-ahead, unless the project has standing
-  permission to push. A session asks about a routine push once, at the wrap, and
-  does not list it among what is waiting or raise it in other turns, unless the
-  work cannot go on without it (diary decision 2026-11-08: when a push is asked
-  about). Before any push, to a private repository as much as a public one,
-  check the changes for secrets and infrastructure details (diary decision
-  2026-10-31: secrets check before private pushes). The operator's identity is
-  not part of that check: the commit hook checks what each commit adds, and
-  `/hh-rules` scans every file at setup and at each update (diary decision
-  2026-11-12: identity covered at commit and by a scan at each update).
+  permission to push. While the hh-advise session supervises the project at the
+  operator's `/hh-supervise`, its go-ahead stands for the operator's, for a push
+  and for raising publishing below (diary decision 2026-11-14: supervising
+  started and ended by the operator, with a log). A session asks about a routine
+  push once, at the wrap, and does not list it among what is waiting or raise it
+  in other turns, unless the work cannot go on without it (diary decision
+  2026-11-08: when a push is asked about). Secrets, the operator's identity and
+  the operator's infrastructure, such as hostnames, domains and addresses, are
+  checked by the commit hooks on what each commit adds, and `/hh-rules` scans
+  every file at setup and at each update, so a push to a private repository
+  needs no review of its own (diary decision 2026-11-12: identity covered at
+  commit and by a scan at each update) (diary decision 2026-11-15: secrets and
+  infrastructure reviewed at publishing).
 - Publishing what Claude wrote, or the files that direct Claude (rules, skills,
   `CLAUDE.md`, the plan and the diary), in a public repository is raised with
   the operator first: a push to a public repository, a new public repository, or
-  a change of visibility. Projects are private unless the operator decides
+  a change of visibility. Before raising it, read everything that would become
+  public, the history included, for secrets and infrastructure details the hooks
+  do not know, such as a secret in a format gitleaks lacks or a server not in
+  the operator's patterns (diary decision 2026-11-15: secrets and infrastructure
+  reviewed at publishing). Projects are private unless the operator decides
   otherwise, and their releases are installed with the operator's login, such as
   `gh release download` onto the operator's own server, from which a tool that
   cannot log in, like Foundry, installs (diary decision 2026-11-05: publishing
