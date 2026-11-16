@@ -26,3 +26,6 @@
   yet built; a passage that belongs where it loads instead; the same thing said
   twice; one of the project's own rules `CLAUDE.md` does not name; and a line
   carrying a decision without its citation.
+- **Pin cspell**: CLAUDE.md has `npx cspell` run by hand before each commit,
+  which fetches an unpinned version. Run it as a pinned hook among the fork's
+  own checks in prek.toml, beside eslint, and drop the by-hand step.
