@@ -1,4 +1,5 @@
 import { FOLDER_ID, ACTOR_IMPORTER_TYPES, ERAS, JOURNAL_STYLES } from '../constants.js'
+import CoC7Check from '../apps/check.js'
 import CoC7ClickableEvents from '../apps/clickable-events.js'
 import CoC7Combat from '../apps/combat.js'
 import CoC7CompendiumFilter from '../setup/compendium-filter.js'
@@ -66,6 +67,7 @@ export default function () {
     messageResults: CoC7MessageResults.loadMessage,
     messagePermissionQueue: [],
     sanCheck: CoC7SanCheckCard.create,
+    developLuck: CoC7Check.developLuck,
     ClickRegionLeftUuid: CoC7ClickableEvents.ClickRegionLeftUuid,
     ClickRegionRightUuid: CoC7ClickableEvents.ClickRegionRightUuid,
     hasPermissionDocument: CoC7ClickableEvents.hasPermissionDocument,

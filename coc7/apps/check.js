@@ -137,6 +137,30 @@ export default class CoC7Check {
   }
 
   /**
+   * Apply a Luck improvement from a rolled Luck check card, once per card
+   * @param {Document|string} message ChatMessage, or its id or uuid
+   * @returns {Promise<boolean>} true if applied, false if refused
+   */
+  static async developLuck (message) {
+    let chatMessage = message
+    if (typeof message === 'string') {
+      chatMessage = (message.includes('.') ? await fromUuid(message) : game.messages.get(message))
+    }
+    const load = chatMessage?.flags?.[FOLDER_ID]?.load
+    if (load?.as !== 'CoC7Check' || load.type !== CoC7Check.type.attribute || load.key !== 'lck' || load.appliedDevelopment !== false || !CoC7DicePool.isValidPool(load.dicePool)) {
+      return false
+    }
+    const check = await CoC7Check.loadFromMessage(chatMessage)
+    const actor = await check.actor
+    if (!check.isRolled || typeof actor === 'undefined' || actor === null) {
+      return false
+    }
+    await chatMessage.update({ ['flags.' + FOLDER_ID + '.load.appliedDevelopment']: true })
+    await actor.developLuck(false, { rolledPool: check.#dicePool })
+    return true
+  }
+
+  /**
    * Render Chat Message
    * @param {documents.ChatMessage} message
    * @param {HTMLElement} html

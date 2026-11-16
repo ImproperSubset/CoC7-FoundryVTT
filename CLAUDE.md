@@ -7,7 +7,10 @@ private to the operator's machines.
 
 The fork exposes `game.CoC7.sanCheck`, the importer helpers on `game.CoC7` and
 `game.CoC7.actorImporterType` for the operator's modules, which call them; each
-merge of an upstream release keeps them.
+merge of an upstream release keeps them. `game.CoC7.developLuck(message)` is one
+of them: it applies `actor.developLuck()`'s gain to a rolled Luck check card's
+d100, at most once per card, and returns whether it did (diary decision
+2026-11-16: a Luck improvement from a rolled Luck check card).
 
 ## Branches
 

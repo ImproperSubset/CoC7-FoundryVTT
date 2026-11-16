@@ -35,6 +35,7 @@ CONFIG.TextEditor = strict('CONFIG.TextEditor', { enrichers: [] })
 game.system = {}
 
 const { ACTOR_IMPORTER_TYPES } = await import('../coc7/constants.js')
+const { default: CoC7Check } = await import('../coc7/apps/check.js')
 const { default: CoC7ClickableEvents } = await import('../coc7/apps/clickable-events.js')
 const { default: CoC7SanCheckCard } = await import('../coc7/apps/san-check-card.js')
 const { default: CoC7Utilities } = await import('../coc7/apps/utilities.js')
@@ -46,6 +47,8 @@ init()
 
 test('game.CoC7 exposes the functions the fork adds', () => {
   assert.equal(game.CoC7.sanCheck, CoC7SanCheckCard.create)
+  assert.equal(typeof game.CoC7.developLuck, 'function')
+  assert.equal(game.CoC7.developLuck, CoC7Check.developLuck)
   assert.equal(game.CoC7.guessItems, CoC7Utilities.guessItems)
   assert.equal(game.CoC7.toKebabCase, CoC7Utilities.toKebabCase)
   assert.equal(game.CoC7.createImportCharactersFolderIfNotExists, CoC7Utilities.createImportCharactersFolderIfNotExists)

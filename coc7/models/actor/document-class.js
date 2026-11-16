@@ -3596,11 +3596,13 @@ export default class CoC7ModelsActorDocumentClass extends Actor {
   /**
    * Roll luck during development phase
    * @param {bool} fastForward
+   * @param {object} options
+   * @param {CoC7DicePool|undefined} options.rolledPool already rolled pool to use instead of a new roll
    */
-  async developLuck (fastForward = false) {
+  async developLuck (fastForward = false, { rolledPool = undefined } = {}) {
     const currentLuck = parseInt(this.system.attribs.lck.value, 10)
     const pulpRuleDevelopmentRollLuck = game.settings.get(FOLDER_ID, 'pulpRuleDevelopmentRollLuck')
-    const upgradeRoll = await CoC7DicePool.rollNewPool({ })
+    const upgradeRoll = (typeof rolledPool === 'undefined' ? await CoC7DicePool.rollNewPool({ }) : rolledPool)
     const rolls = []
     if (!fastForward) {
       rolls.push(...upgradeRoll.newRolls)
