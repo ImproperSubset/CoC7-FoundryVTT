@@ -1179,7 +1179,7 @@ export default class CoC7DicePool {
           }
         }
         if (!this.isSuccess) {
-          if (!isSanity && isPushable && (!this.isFumble || game.settings.get(FOLDER_ID, 'allowPushFumbles'))) {
+          if (!isLuck && !isSanity && isPushable && (!this.isFumble || game.settings.get(FOLDER_ID, 'allowPushFumbles'))) {
             buttons.pushRoll = true
           }
           if (!this.isFumble && !isLuck && !isSanity && !this.isMalfunction) {
