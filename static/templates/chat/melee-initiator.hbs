@@ -128,6 +128,11 @@
       {{/each}}
     </div>
   </div>
+  {{#if isHeld}}
+    <div class="keeper-only-block coc7-card-buttons flexrow">
+      <button data-action="releaseHold">{{localize 'CoC7.ReleaseToPlayers'}}</button>
+    </div>
+  {{/if}}
   <div class="owner-and-keeper-block coc7-card-buttons flexrow" data-actor-uuid="{{actorUuid}}">
     {{#each skills as |skill|}}
       <button data-action="attackerRoll" data-skill="{{skill.id}}">{{skill.name}}: ({{skill.system.value}}%)</button>

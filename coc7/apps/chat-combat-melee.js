@@ -15,6 +15,7 @@ export default class CoC7ChatCombatMelee {
   #damageMessageId
   #dicePool
   #isAutoSuccess
+  #isHeld
   #isNoResponse
   #noConsequence
   #participant
@@ -30,6 +31,7 @@ export default class CoC7ChatCombatMelee {
     this.#checkRevealed = true
     this.#dicePool = CoC7DicePool.newPool({ })
     this.#isAutoSuccess = false
+    this.#isHeld = false
     this.#isNoResponse = false
     this.#noConsequence = false
     this.#poolModifier = 0
@@ -47,6 +49,14 @@ export default class CoC7ChatCombatMelee {
       initiator: 0,
       target: 1
     }
+  }
+
+  /**
+   * Actions a player cannot take while the card is held
+   * @returns {Array}
+   */
+  static get heldActions () {
+    return ['attackerRoll', 'targetRoll']
   }
 
   /**
@@ -82,6 +92,7 @@ export default class CoC7ChatCombatMelee {
       check.#attackerMessageId = attackerCheck?.message.id
       check.attacker = attackerUuid
       check.item = itemUuid
+      check.#isHeld = game.settings.get(FOLDER_ID, 'holdCombatCards')
       check.#participant = participant
       check.target = targetUuid
       await check.#setInitialPoolModifier(check.attacker)
@@ -110,6 +121,7 @@ export default class CoC7ChatCombatMelee {
       'checkRevealed',
       // 'damageMessageId'
       'isAutoSuccess',
+      // 'isHeld' - new field
       'isNoResponse',
       // 'itemUuid' - no response can be selected
       // 'noConsequence' - new field
@@ -129,6 +141,9 @@ export default class CoC7ChatCombatMelee {
       check.#damageMessageId = load.damageMessageId
       check.#dicePool = CoC7DicePool.fromObject(load.dicePool)
       check.#isAutoSuccess = load.isAutoSuccess
+      if (typeof load.isHeld !== 'undefined') {
+        check.#isHeld = load.isHeld
+      }
       check.#isNoResponse = load.isNoResponse
       check.item = load.itemUuid
       if (typeof load.noConsequence !== 'undefined') {
@@ -296,6 +311,13 @@ export default class CoC7ChatCombatMelee {
           } else {
             ui.notifications.warn('CoC7.Errors.UnparsableModification', { localize: true })
           }
+        }
+        break
+      case 'releaseHold':
+        if (game.user.isGM) {
+          const check = await CoC7ChatCombatMelee.loadFromMessage(message)
+          check.#isHeld = false
+          check.updateMessage()
         }
         break
       case 'revealCheck':
@@ -498,9 +520,12 @@ export default class CoC7ChatCombatMelee {
    * @param {false|Array} allowed
    */
   static async _onRenderMessage (message, html, context, allowed) {
+    const isHeld = CoC7Utilities.isCardHeld(message)
     if (game.user.isGM || allowed) {
       html.querySelectorAll('[data-action]').forEach((element) => {
-        if (game.user.isGM || allowed.includes(element.parentElement.dataset.actorUuid)) {
+        if (isHeld && CoC7ChatCombatMelee.heldActions.includes(element.dataset.action)) {
+          element.disabled = true
+        } else if (game.user.isGM || allowed.includes(element.parentElement.dataset.actorUuid)) {
           element.addEventListener('click', event => CoC7ChatCombatMelee._onClickEvent(event, message))
         }
       })
@@ -641,6 +666,7 @@ export default class CoC7ChatCombatMelee {
       isAutoSuccess: this.#isAutoSuccess,
       isDodge: (this.#isNoResponse ? false : item?.type === 'skill' && item?.system?.isDodge === true),
       isFightBack: (this.#isNoResponse ? false : item?.type === 'weapon'),
+      isHeld: this.#isHeld,
       isManeuver: (this.#isNoResponse ? false : item?.type === 'skill' && item?.system?.isDodge !== true),
       isNoResponse: this.#isNoResponse,
       isRolledSuccess: (this.#dicePool.isRolled ? this.#dicePool.isRolledSuccess : false),
@@ -817,6 +843,7 @@ export default class CoC7ChatCombatMelee {
             difficulty: data.difficulty,
             finalPoolModifier: data.finalPoolModifier,
             isAutoSuccess: this.#isAutoSuccess,
+            isHeld: this.#isHeld,
             isNoResponse: this.#isNoResponse,
             itemUuid: data.itemUuid,
             noConsequence: this.#noConsequence,

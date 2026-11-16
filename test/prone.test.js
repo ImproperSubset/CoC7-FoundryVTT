@@ -1,114 +1,10 @@
 import { documents, settings } from './foundry-stubs.js'
+import { actor, clearCreatedCard, clickCard, createdCard, savedMeleeMessage, savedRangedMessage, weapon } from './combat-cards.js'
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import CoC7ChatCombatMelee from '../coc7/apps/chat-combat-melee.js'
 import CoC7ChatCombatRanged from '../coc7/apps/chat-combat-ranged.js'
-import CoC7DicePool from '../coc7/apps/dice-pool.js'
 import CoC7Utilities from '../coc7/apps/utilities.js'
-
-settings.ddtRuleShootingWithOffHand = false
-settings.disregardAmmo = false
-settings.disregardUsePerRound = false
-settings.displayActorOnCard = false
-settings.distanceTheatreOfTheMind = true
-settings.pulpRuleLuckMalfunction = false
-settings.rollMode = 'publicroll' // cspell:disable-line
-
-let created
-globalThis.ChatMessage = {
-  create: async (chatData) => {
-    created = chatData
-  }
-}
-globalThis.canvas = {
-  grid: {
-    units: 'ft'
-  },
-  scene: {
-    uuid: 'Scene.scene'
-  }
-}
-
-/**
- * Create an actor with only the data the combat cards read
- * @param {object} options
- * @param {boolean} options.prone
- * @param {Array} options.disable dice pool keys a talent disables
- * @param {Array} options.show talent adjustments that show a talent on combat cards
- * @param {boolean} options.token
- * @returns {object}
- */
-function actor ({ prone = false, disable = [], show = [], token = false } = {}) {
-  const items = disable.map(key => ({
-    type: 'talent',
-    system: {
-      adjustments: [{
-        type: 'disableCombatPool',
-        config: {
-          disable: key
-        }
-      }]
-    }
-  })).concat(show.map(type => ({
-    type: 'talent',
-    link: type,
-    effects: [],
-    system: {
-      adjustments: [{
-        type,
-        config: {}
-      }]
-    }
-  })))
-  items.get = () => undefined
-  return {
-    type: 'character',
-    name: 'Actor',
-    img: '',
-    isToken: false,
-    items,
-    system: {
-      attribs: {
-        build: { value: 0 },
-        lck: { value: 50 },
-        mov: { value: 8 }
-      },
-      characteristics: {
-        dex: { value: 60 }
-      }
-    },
-    getDependentTokens: () => (token ? [{ object: {} }] : []),
-    hasConditionStatus: key => key === 'prone' && prone
-  }
-}
-
-/**
- * Create a weapon with only the data the combat cards open with
- * @param {boolean} rngd
- * @returns {object}
- */
-function weapon (rngd) {
-  return {
-    type: 'weapon',
-    system: {
-      bonusDice: 0,
-      properties: {
-        auto: false,
-        rngd
-      },
-      singleShot: true,
-      skill: {
-        main: {
-          id: 'skill'
-        }
-      },
-      skillAlternative: null,
-      baseRange: async () => 15,
-      longRange: async () => 30,
-      extremeRange: async () => 60
-    }
-  }
-}
 
 /**
  * Open a ranged combat card and return the targets it saves
@@ -131,9 +27,9 @@ async function rangedTargets ({ shooter = {}, targets = [{}], yards }, t) {
     documents['Actor.target' + offset] = actor({ ...options, token })
     return 'Actor.target' + offset
   })
-  created = undefined
+  clearCreatedCard()
   await CoC7ChatCombatRanged.createMessage({ attackerUuid: 'Actor.attacker', itemUuid: 'Item.weapon', targetUuids })
-  return created.flags.CoC7.load.targets
+  return createdCard().flags.CoC7.load.targets
 }
 
 /**
@@ -145,47 +41,9 @@ async function rangedTargets ({ shooter = {}, targets = [{}], yards }, t) {
  * @returns {object}
  */
 async function rangedClick (targets, action, set, t) {
-  t.mock.method(CoC7ChatCombatRanged.prototype, 'getTemplateData', async () => ({}))
-  let updated
-  t.mock.method(CoC7ChatCombatRanged.prototype, 'updateMessage', function () {
-    updated = this
-  })
   documents['Actor.attacker'] = actor()
   documents['Item.weapon'] = weapon(true)
-  const message = {
-    id: 'message',
-    flags: {
-      CoC7: {
-        load: {
-          as: 'CoC7ChatCombatRanged',
-          actorUuid: 'Actor.attacker',
-          aiming: false,
-          burst: false,
-          damage: [],
-          damageDealt: false,
-          damageRolled: false,
-          fullAuto: false,
-          itemUuid: 'Item.weapon',
-          multipleShots: false,
-          sceneUuid: '',
-          shots: [],
-          singleShot: true,
-          targets,
-          totalBulletsFired: 0,
-          volleyMax: 0,
-          volleySize: 0,
-          weaponRolled: false
-        }
-      }
-    }
-  }
-  const event = {
-    currentTarget: {
-      dataset: { action, set },
-      closest: () => ({ dataset: { offset: 0 } })
-    }
-  }
-  await CoC7ChatCombatRanged._onClickEvent(event, message)
+  const updated = await clickCard(CoC7ChatCombatRanged, savedRangedMessage({ targets }), action, set, t)
   return (await updated.getChatData()).flags.CoC7.load.targets[0]
 }
 
@@ -200,9 +58,9 @@ async function meleePoolKeys (options, t) {
   documents['Actor.attacker'] = actor()
   documents['Actor.target'] = actor(options)
   documents['Item.weapon'] = weapon(false)
-  created = undefined
+  clearCreatedCard()
   await CoC7ChatCombatMelee.createMessage({ attackerUuid: 'Actor.attacker', itemUuid: 'Item.weapon', targetUuid: 'Actor.target' })
-  return created.flags.CoC7.load.poolKeys
+  return createdCard().flags.CoC7.load.poolKeys
 }
 
 test('the Prone reasons appear only when the Pulp Prone rule is on', () => {
@@ -335,9 +193,9 @@ async function responsePoolKeys (options, t) {
   t.mock.method(CoC7ChatCombatMelee.prototype, 'getTemplateData', async () => ({}))
   documents['Actor.attacker'] = actor(options)
   documents['Actor.target'] = actor()
-  created = undefined
+  clearCreatedCard()
   await CoC7ChatCombatMelee.createMessage({ attackerCheck: { message: { id: 'attackerMessage' } }, attackerUuid: 'Actor.attacker', targetUuid: 'Actor.target', participant: CoC7ChatCombatMelee.participant.target })
-  return created.flags.CoC7.load.poolKeys
+  return createdCard().flags.CoC7.load.poolKeys
 }
 
 test('a response card ticks the bonus when the attacker is prone', async (t) => {
@@ -387,27 +245,12 @@ async function meleeCardData ({ participant, response, poolKeys, attacker = {}, 
       value: 50
     }
   }
-  const message = {
-    id: 'message',
-    flags: {
-      CoC7: {
-        load: {
-          as: 'CoC7ChatCombatMelee',
-          attackerUuid: 'Actor.attacker',
-          checkRevealed: true,
-          dicePool: CoC7DicePool.newPool({}).toObject(),
-          isAutoSuccess: false,
-          isNoResponse: response === 'none',
-          itemUuid: (response === 'none' ? '' : 'Item.response'),
-          participant,
-          poolKeys,
-          poolModifier: 0,
-          responded: false,
-          targetUuid: 'Actor.target'
-        }
-      }
-    }
-  }
+  const message = savedMeleeMessage({
+    isNoResponse: response === 'none',
+    itemUuid: (response === 'none' ? '' : 'Item.response'),
+    participant,
+    poolKeys
+  })
   return (await CoC7ChatCombatMelee.loadFromMessage(message)).getTemplateData()
 }
 

@@ -851,6 +851,15 @@ export default class CoC7Utilities {
   }
 
   /**
+   * Is the combat card held from the current user until the Keeper releases it
+   * @param {documents.ChatMessage} message
+   * @returns {boolean}
+   */
+  static isCardHeld (message) {
+    return !game.user.isGM && message.flags[FOLDER_ID]?.load?.isHeld === true
+  }
+
+  /**
    * Add Item summary to HTML Element
    * @param {HtmlElement} div
    * @param {object|Document} item

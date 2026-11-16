@@ -173,6 +173,15 @@ export default function () {
     default: false,
     type: Boolean
   })
+  /** New combat cards are held until the Keeper releases them to players */
+  game.settings.register(FOLDER_ID, 'holdCombatCards', {
+    name: 'SETTINGS.HoldCombatCards',
+    hint: 'SETTINGS.HoldCombatCardsHint',
+    scope: 'world',
+    config: true,
+    default: false,
+    type: Boolean
+  })
   game.settings.register(FOLDER_ID, 'displayCheckSuccessLevel', {
     name: 'SETTINGS.DisplayCheckSuccessLevel',
     scope: 'client',

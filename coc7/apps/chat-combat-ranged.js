@@ -13,6 +13,7 @@ export default class CoC7ChatCombatRanged {
   #damageDealt
   #damageRolled
   #fullAuto
+  #isHeld
   #multipleShots
   #weaponRolled
   #sceneUuid
@@ -35,6 +36,7 @@ export default class CoC7ChatCombatRanged {
     this.#multipleShots = false
     this.#burst = false
     this.#fullAuto = false
+    this.#isHeld = false
     this.#totalBulletsFired = 0
     this.#targets = []
     this.#volleyMax = 0
@@ -45,6 +47,14 @@ export default class CoC7ChatCombatRanged {
     this.#damage = []
     this.#damageDealt = false
     this.#damageRolled = false
+  }
+
+  /**
+   * Actions a player cannot take while the card is held
+   * @returns {Array}
+   */
+  static get heldActions () {
+    return ['range-initiator-roll', 'range-initiator-shoot']
   }
 
   /**
@@ -79,6 +89,7 @@ export default class CoC7ChatCombatRanged {
       const check = new CoC7ChatCombatRanged()
       check.attacker = attackerUuid
       check.item = itemUuid
+      check.#isHeld = game.settings.get(FOLDER_ID, 'holdCombatCards')
       check.#sceneUuid = canvas.scene?.uuid ?? ''
       const attacker = (await check.attacker)
       const item = (await check.item)
@@ -481,6 +492,7 @@ export default class CoC7ChatCombatRanged {
       'damageDealt',
       'damageRolled',
       'fullAuto',
+      // 'isHeld' - new field
       'itemUuid',
       'multipleShots',
       'sceneUuid',
@@ -506,6 +518,9 @@ export default class CoC7ChatCombatRanged {
       check.#damageDealt = load.damageDealt
       check.#damageRolled = load.damageRolled
       check.#fullAuto = load.fullAuto
+      if (typeof load.isHeld !== 'undefined') {
+        check.#isHeld = load.isHeld
+      }
       check.item = load.itemUuid
       check.#multipleShots = load.multipleShots
       check.#sceneUuid = load.sceneUuid
@@ -710,6 +725,13 @@ export default class CoC7ChatCombatRanged {
           }
         }
         break
+      case 'releaseHold':
+        if (game.user.isGM) {
+          const check = await CoC7ChatCombatRanged.loadFromMessage(message)
+          check.#isHeld = false
+          check.updateMessage()
+        }
+        break
       case 'luck':
         {
           const check = await CoC7ChatCombatRanged.loadFromMessage(message)
@@ -844,9 +866,12 @@ export default class CoC7ChatCombatRanged {
    * @param {false|Array} allowed
    */
   static async _onRenderMessage (message, html, context, allowed) {
+    const isHeld = CoC7Utilities.isCardHeld(message)
     if (game.user.isGM || allowed) {
       html.querySelectorAll('[data-action]').forEach((element) => {
-        if (game.user.isGM || allowed.includes(element.parentElement.dataset.actorUuid)) {
+        if (isHeld && CoC7ChatCombatRanged.heldActions.includes(element.dataset.action)) {
+          element.disabled = true
+        } else if (game.user.isGM || allowed.includes(element.parentElement.dataset.actorUuid)) {
           element.addEventListener('click', event => CoC7ChatCombatRanged._onClickEvent(event, message))
         }
       })
@@ -948,6 +973,7 @@ export default class CoC7ChatCombatRanged {
       foundryGeneration: game.release.generation,
       fullAuto: this.#fullAuto,
       hasWeaponSpecial: item?.system.properties.spcl,
+      isHeld: this.#isHeld,
       item,
       itemImg: item?.img,
       itemName: item?.name,
@@ -1140,6 +1166,7 @@ export default class CoC7ChatCombatRanged {
             damageRolled: this.#damageRolled,
             cardOpen: true,
             fullAuto: this.#fullAuto,
+            isHeld: this.#isHeld,
             itemUuid: data.itemUuid,
             multipleShots: this.#multipleShots,
             sceneUuid: this.#sceneUuid,

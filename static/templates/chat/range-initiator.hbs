@@ -57,6 +57,11 @@
       {{/if}}
       <button class="keeper-only-control{{#if aiming}}{{#if (gt shotFired 0)}} coc7-disabled{{else}} switched-on{{/if}}{{/if}}" data-action="toggleValue" data-set="aiming"{{#if shotFired}} disabled="disabled"{{/if}} data-tooltip="CoC7.rangeCombatCard.AimingTitle"><i class="fa-regular {{#if aiming}}fa-square-check{{else}}fa-square{{/if}}"></i> {{localize 'CoC7.rangeCombatCard.aiming'}}</button>
     </div>
+    {{#if isHeld}}
+      <div class="keeper-only-block coc7-card-buttons flexrow">
+        <button data-action="releaseHold">{{localize 'CoC7.ReleaseToPlayers'}}</button>
+      </div>
+    {{/if}}
   {{/if}}
 </div>
 <div class="ranged-targets-portraits flexrow" data-actor-uuid="{{attackerUuid}}">
