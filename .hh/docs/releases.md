@@ -6,14 +6,19 @@
   number: `8.16.hh.4`, then `9.2.hh.1` on 9.2. Foundry VTT compares versions
   part by part, so each counts as newer than the one before and than the CoC7
   release itself. A fix without a new CoC7 release bumps the build number.
-- Every build that reaches a Foundry instance carries a `.hh.<build>` version
-  and the fork's manifest. A build straight from the branch carries upstream's
-  plain version and manifest, so it would look like upstream's release and take
+- Every build that reaches a server instance carries a `.hh.<build>` version and
+  the fork's manifest. A build straight from the branch carries upstream's plain
+  version and manifest, so it would look like upstream's release and take
   upstream's updates. `static/system.json` on the branch stays upstream's; the
   release workflow writes the fork's values.
 - Foundry instances install the system from the fork's release manifest URL and
-  get new releases as Foundry updates. A build from a clone never goes into an
-  instance in place of a release.
+  get new releases as Foundry updates. A build from a clone never goes into a
+  server instance in place of a release.
+- A local Foundry runtime used for testing runs a build of the branch, so the
+  fork's changes can be tried without a release (diary decision 2026-11-16:
+  local runtimes run the branch). Its upstream manifest offers upstream's
+  releases as system updates there; those are declined, and the branch is built
+  again instead.
 
 ## Releasing
 
