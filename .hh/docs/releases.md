@@ -72,3 +72,7 @@ takes them in.
   `npm run compendiums-build` comes first; it empties the build folder and
   rewrites every compendium pack. `npx webpack --mode development` writes the
   code and keeps watching until killed.
+- A build goes into a runtime only while its world is stopped. The development
+  build skips a pack only when it cannot open the pack's `LOCK` file, which on
+  Linux it always can, so it copies the packs even into a world that has them
+  open (diary decision 2026-11-16: builds only into a stopped world).
