@@ -30,6 +30,13 @@
       has set them. The operator: "I like it."
     - Rejected: the attacker's roll alone, because it fixes only half the
       problem.
+  - CC_PLAN_DECISION: the Keeper hold setting's scope
+    - Options considered: a CoC7 setting of world scope; one of client scope.
+    - Chosen: world scope, shown among the system's settings on its Configure
+      Settings tab and kept in each world, because only the Keeper can change
+      it, a player cannot switch the hold off for themselves, and each world
+      sets it apart. The operator: "That's fine."
+    - Rejected: client scope, because each player would set their own.
 
 ## Later
 
