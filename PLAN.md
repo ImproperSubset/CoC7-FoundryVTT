@@ -1,10 +1,5 @@
 # Plan
 
-- **Loose end**: 9.2.hh.2, carrying the issue #8 fix, is a pre-release, and
-  9.2.hh.1 the latest release, since the operator had not asked for a release.
-  The fix has been tried on the test server. It waits on the operator: settled
-  when the operator asks for 9.2.hh.2 to become the release, or for the fix to
-  ship in a later one.
 - **Loose end**: upstream's `copyBinaryPack` in `scripts/webpack-config.js`
   skips a pack only when opening its `LOCK` file fails, which on Linux it never
   does, so a development build writes packs under a running world. The diagnosis
