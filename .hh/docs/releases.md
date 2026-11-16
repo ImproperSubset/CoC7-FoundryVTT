@@ -35,12 +35,13 @@ gh release create "${tag}" --target hh-main --title "${tag}" --notes "..."
 
 `.github/workflows/fork-release.yml` checks the tag is `static/system.json`'s
 version plus `.hh.<build>`, installs with `npm ci` from `package-lock.json`, not
-`npm install`, so a release is built from the dependencies that were tested
-(diary decision 2026-11-16: releases built from the lock file), builds the
-system and its packs, points `version`, `url`, `manifest` and `download` in
-`system.json` at the fork, and attaches `system.json` and `system.zip`.
-`gh release create` publishes before the workflow runs, so a stopped wait still
-leaves the release published.
+`npm install`, so a release is built from the dependencies that were tested. The
+fork tracks `package-lock.json`, which upstream ignores, so the workflow has it
+(diary decision 2026-11-16: releases built from the tracked lock file). The
+release builds the system and its packs, points `version`, `url`, `manifest` and
+`download` in `system.json` at the fork, and attaches `system.json` and
+`system.zip`. `gh release create` publishes before the workflow runs, so a
+stopped wait still leaves the release published.
 
 ## Taking a new upstream release
 
@@ -55,9 +56,12 @@ git merge <release>
 
 A conflict is resolved keeping both upstream's change and the fork's. A conflict
 in `coc7/hooks/init.js` means the system changed the `game.CoC7` object; re-add
-the fork's imports and entries. The merge is checked by the fork's own tests,
-`npm test`, and by `npm run eslint` and a build. It then ships as
-`<release>.hh.1`.
+the fork's imports and entries. Upstream does not track `package-lock.json`, so
+the merge leaves it as it was: after the merge, run `npm install` to bring it in
+line with upstream's `package.json`, and commit it with the merge (diary
+decision 2026-11-16: releases built from the tracked lock file). The merge is
+checked by the fork's own tests, `npm test`, and by `npm run eslint` and a
+build. It then ships as `<release>.hh.1`.
 
 Commits taken from upstream between its releases are cherry-picked onto
 `hh-main` and ship as the next `.hh.<build>` release; the next release's merge

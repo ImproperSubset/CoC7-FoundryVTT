@@ -2,7 +2,6 @@
 *.todo
 /fvtt.config.json
 /node_modules/
-/package-lock.json
 /temp/
 # Previous file structure
 .husky/_
