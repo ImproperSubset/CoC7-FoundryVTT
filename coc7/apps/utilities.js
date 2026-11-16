@@ -851,7 +851,7 @@ export default class CoC7Utilities {
   }
 
   /**
-   * Is the combat card held from the current user until the Keeper releases it
+   * Is the combat card held from the current user until the Keeper releases it, shown to players with its rolls disabled rather than whispered to the Keeper (diary decision 2026-11-16: combat cards held for the Keeper)
    * @param {documents.ChatMessage} message
    * @returns {boolean}
    */

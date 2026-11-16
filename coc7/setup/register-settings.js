@@ -173,7 +173,7 @@ export default function () {
     default: false,
     type: Boolean
   })
-  /** New combat cards are held until the Keeper releases them to players */
+  /** New combat cards are held until the Keeper releases them to players, world scope so a player cannot switch it off (diary decision 2026-11-16: the Keeper hold setting's scope) */
   game.settings.register(FOLDER_ID, 'holdCombatCards', {
     name: 'SETTINGS.HoldCombatCards',
     hint: 'SETTINGS.HoldCombatCardsHint',

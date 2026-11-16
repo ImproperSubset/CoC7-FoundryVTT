@@ -50,7 +50,7 @@ export default class CoC7ChatCombatRanged {
   }
 
   /**
-   * Actions a player cannot take while the card is held
+   * Actions a player cannot take while the card is held, only the rolls: a player still picks a response or a shot type, whose dice the Keeper sets after (diary decision 2026-11-16: what a held combat card holds)
    * @returns {Array}
    */
   static get heldActions () {
@@ -89,6 +89,7 @@ export default class CoC7ChatCombatRanged {
       const check = new CoC7ChatCombatRanged()
       check.attacker = attackerUuid
       check.item = itemUuid
+      // Every new card is held, the Keeper's too, as it can carry a player's roll (diary decision 2026-11-16: Keeper-made combat cards held too)
       check.#isHeld = game.settings.get(FOLDER_ID, 'holdCombatCards')
       check.#sceneUuid = canvas.scene?.uuid ?? ''
       const attacker = (await check.attacker)
