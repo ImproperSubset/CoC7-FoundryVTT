@@ -21,3 +21,11 @@ copies = [
   { file = "static/templates/chat/range-initiator.hbs", text = "sha256:fc39483fdd8e3d134e10a62480c0d87b1022db0f524bf75bae27a8317f644c47" },
   { file = "static/templates/chat/range-initiator.hbs", text = "sha256:cd9dd86119b1e8f29aae7c5d07be653a00e804a3c89659bcb13c0215efd23310" },
 ]
+
+[[set]]
+verdict = "kept"
+reason = "the fork's copy of upstream's attacker card markup in the defender card, the same kind as the two melee sets above; sharing it would make upstream's melee-initiator.hbs use a partial, which would conflict at every merge"
+copies = [
+  { file = "static/templates/chat/melee-initiator.hbs", text = "sha256:8ab6f083d9d0e8ed099111a745b3bffd1b12d0ab9dfa20a7e617e3aa3cf889d5" },
+  { file = "static/templates/chat/melee-target.hbs", text = "sha256:422c75d420ba9dbbc121fffc06cf9da43d92f85d04654b7de86c2142d597e971" },
+]

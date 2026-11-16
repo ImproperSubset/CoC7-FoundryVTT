@@ -10,10 +10,6 @@
 - **New duplication**: `coc7/apps/chat-combat-melee.js:510-527` and
   `coc7/apps/chat-combat-ranged.js:856-873`, a mainline set new since def0f082.
   Remove it with `/hh-dedupe`, or keep it with the operator's agreement.
-- **New duplication**: `static/templates/chat/melee-initiator.hbs:131-136` and
-  `static/templates/chat/melee-target.hbs:109-114`, a mainline set new since
-  def0f082. Remove it with `/hh-dedupe`, or keep it with the operator's
-  agreement.
 
 ## Later
 
