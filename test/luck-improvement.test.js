@@ -219,6 +219,22 @@ test('a Luck check card is applied once', async (t) => {
   assert.equal(message.update.mock.callCount(), 1)
 })
 
+test('two overlapping calls on a Luck check card apply it once', async (t) => {
+  const { actor, message } = card(t)
+  const results = await Promise.all([CoC7Check.developLuck(message), CoC7Check.developLuck(message)])
+  assert.deepEqual(results.toSorted(), [false, true])
+  assert.equal(actor.developLuck.mock.callCount(), 1)
+  assert.equal(message.update.mock.callCount(), 1)
+})
+
+test('a Luck check card can be applied after an earlier call on it was refused', async (t) => {
+  const { actor, message } = card(t, {}, { isRolled: false })
+  assert.equal(await CoC7Check.developLuck(message), false)
+  t.mock.getter(CoC7DicePool.prototype, 'isRolled', () => true)
+  assert.equal(await CoC7Check.developLuck(message), true)
+  assert.equal(actor.developLuck.mock.callCount(), 1)
+})
+
 for (const [name, load, options] of [
   ['a check of another key', { key: 'str', type: 'characteristic' }, {}],
   ['a card that is not a check', { as: 'CoC7SanCheckCard' }, {}],

@@ -6,6 +6,8 @@ import CoC7SystemSocket from './system-socket.js'
 import CoC7Utilities from './utilities.js'
 
 export default class CoC7Check {
+  static #developingLuck = new Set()
+
   #allowPush
   #appliedDevelopment
   #asyncActor
@@ -150,14 +152,23 @@ export default class CoC7Check {
     if (load?.as !== 'CoC7Check' || load.type !== CoC7Check.type.attribute || load.key !== 'lck' || load.appliedDevelopment !== false || !CoC7DicePool.isValidPool(load.dicePool)) {
       return false
     }
-    const check = await CoC7Check.loadFromMessage(chatMessage)
-    const actor = await check.actor
-    if (!check.isRolled || typeof actor === 'undefined' || actor === null) {
+    // The flag is saved only after awaits, so a call already in progress on this client also refuses the card (diary decision 2026-11-16: overlapping Luck improvement calls)
+    if (CoC7Check.#developingLuck.has(chatMessage.id)) {
       return false
     }
-    await chatMessage.update({ ['flags.' + FOLDER_ID + '.load.appliedDevelopment']: true })
-    await actor.developLuck(false, { rolledPool: check.#dicePool })
-    return true
+    CoC7Check.#developingLuck.add(chatMessage.id)
+    try {
+      const check = await CoC7Check.loadFromMessage(chatMessage)
+      const actor = await check.actor
+      if (!check.isRolled || typeof actor === 'undefined' || actor === null) {
+        return false
+      }
+      await chatMessage.update({ ['flags.' + FOLDER_ID + '.load.appliedDevelopment']: true })
+      await actor.developLuck(false, { rolledPool: check.#dicePool })
+      return true
+    } finally {
+      CoC7Check.#developingLuck.delete(chatMessage.id)
+    }
   }
 
   /**
