@@ -1,10 +1,5 @@
 # Plan
 
-- **Loose end**: upstream's `copyBinaryPack` in `scripts/webpack-config.js`
-  skips a pack only when opening its `LOCK` file fails, which on Linux it never
-  does, so a development build writes packs under a running world. The diagnosis
-  is with the operator, who decides whether it is reported upstream or accepted;
-  settled by that decision.
 - **New duplication**: `test/combat-cards.js:129-142`,
   `test/maneuver.test.js:69-81` and
   `test/melee-response-dropdown.test.js:42-54`, a test set new since def0f082.
