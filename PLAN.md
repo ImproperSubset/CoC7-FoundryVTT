@@ -2,15 +2,15 @@
 
 - **Keeper hold on combat cards**: a CoC7 system setting of world scope, off by
   default, under which each new melee and ranged attack card starts on hold.
-  While a card is held, players see it but its player buttons are disabled: the
-  attacker's roll, and on the melee target card the defender's responses too.
-  The Keeper sets the card up, then presses a Keeper-only "Release to players"
-  button that lifts the hold for every viewer. The hold is a value saved on the
-  card, shaped like the melee card's existing `checkRevealed` state and its
-  `revealCheck` action; the ranged card gets the same from scratch. Fork-only;
-  new strings go in `en.json` only. Checked by tests of the hold and release on
-  both cards' saved state, and by trying it in a world, since no test renders a
-  template.
+  While a card is held, players see it but its roll buttons are disabled: the
+  attacker's roll, and on the melee target card the defender's roll; the
+  defender still picks a response while it is held. The Keeper sets the card up,
+  then presses a Keeper-only "Release to players" button that lifts the hold for
+  every viewer. The hold is a value saved on the card, shaped like the melee
+  card's existing `checkRevealed` state and its `revealCheck` action; the ranged
+  card gets the same from scratch. Fork-only; new strings go in `en.json` only.
+  Checked by tests of the hold and release on both cards' saved state, and by
+  trying it in a world, since no test renders a template.
   - CC_PLAN_DECISION: combat cards held for the Keeper
     - Options considered: the card whispered to the Keeper alone by roll mode,
       then revealed; the card shown to all with players' roll buttons disabled
@@ -22,13 +22,17 @@
       that player's roll mode, and the system has no step to hand a whispered
       card over to the players afterwards.
   - CC_PLAN_DECISION: what a held combat card holds
-    - Options considered: the attacker's roll alone; the attacker's roll and, on
-      the melee target card, the defender's responses.
-    - Chosen: both, because the Keeper also sets the defender's dice, and a
-      player whose character is attacked can otherwise answer before the Keeper
-      has set them. The operator: "I like it."
-    - Rejected: the attacker's roll alone, because it fixes only half the
-      problem.
+    - Options considered: the attacker's roll alone; the attacker's roll and the
+      defender's responses on the melee target card; the roll buttons on both
+      melee cards, with the defender's response choice left open.
+    - Chosen: the roll buttons on both cards, because the Keeper also sets the
+      defender's dice, and the target card shows the dice for a response only
+      once the player has picked it. The operator: "Yes. That's the right thing
+      to do."
+    - Rejected: the attacker's roll alone, because a defending player could roll
+      before the Keeper sets their dice; holding the responses too, because the
+      player could not pick a response while held, so the Keeper would have to
+      pick it or release before the dice are set.
   - CC_PLAN_DECISION: the Keeper hold setting's scope
     - Options considered: a CoC7 setting of world scope; one of client scope.
     - Chosen: world scope, shown among the system's settings on its Configure
