@@ -1,15 +1,5 @@
 # Plan
 
-- **Loose end**: whether the server's ssh alias goes in
-  `~/.config/hh-rules/identity.toml`, so a commit naming it is refused; asked of
-  the operator after hh-advise found it in a diary line, unanswered. Settled by
-  the operator's answer.
-- **Loose end**: issue #5, a cost summary in the spell sheet's header from the
-  cost list, is open and not in the plan; asked of the operator whether to start
-  it, unanswered. Settled by the operator scheduling or declining it.
-- **Loose end**: hh-advise's review of the Keeper hold (81f451bd, 4cf10dfe), on
-  this session's report, had not come back at the wrap. Settled by its findings
-  being dealt with.
 - **New duplication**: `test/combat-cards.js:129-142`,
   `test/maneuver.test.js:69-81` and
   `test/melee-response-dropdown.test.js:42-54`, a test set new since def0f082.
