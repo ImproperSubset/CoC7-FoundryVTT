@@ -5,7 +5,7 @@
     {
       "source": "https://github.com/ImproperSubset/hh-rules",
       "transport": "git",
-      "ref": "v0.25.0",
+      "ref": "v0.26.0",
       "rules": ["principles", "diary", "glossary", "zsh", "sandbox"],
       "skills": ["hh-dedupe", "hh-drift", "hh-wrap"]
     },

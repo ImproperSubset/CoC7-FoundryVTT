@@ -99,9 +99,15 @@ How Claude and the operator work together on this project.
   sub-project stays inside its boundary; a change to an interface is agreed by
   the sub-projects on both sides (diary decision 2026-10-31: review process
   within a project).
-- Claudes working on different projects communicate through GitHub issues and
-  pull requests in the receiving project's repository. A request to another
-  project is an issue there, and that project's Claude does the work.
+- Claudes working on different projects may message each other's live sessions
+  directly with a question, an answer, a read-only check of something the other
+  project holds, or a heads-up that an issue was filed. A request for work is an
+  issue in the receiving project's repository wherever it has one on GitHub,
+  since a message is lost when either session ends and the issue is listed at
+  the project's next start; in a project with no remote, the message is the
+  request. Either way the receiving session starts no work on it until its
+  operator agrees, and that project's Claude does the work (diary decision
+  2026-11-19: messages between project sessions, work requests as issues).
 - Only the operator decides to contact anyone outside the operator's own
   projects, such as a fork's upstream or the maintainers of a tool. Nothing goes
   to a repository the operator does not own unless the operator asks for that
@@ -395,6 +401,13 @@ How Claude and the operator work together on this project.
   `gh release download` onto the operator's own server, from which a tool that
   cannot log in, like Foundry, installs (diary decision 2026-11-05: publishing
   raised with the operator).
+- A release needs the operator's go-ahead, as a push does, and supervising does
+  not extend to one. A session may say that work can't be tried until a release.
+  It asks about making one once, at the wrap, and does not list it among what is
+  waiting or raise it in other turns. The operator decides when a release is
+  made, after trying the work on a test server where the project has one. A task
+  never includes a release unless the operator asked for it (diary decision
+  2026-11-19: releases at the operator's go-ahead, asked once at the wrap).
 - Pushed is published. Anything wrong in pushed commits is fixed by a new
   commit; rewriting pushed history does not remove it, because clones, forks and
   caches keep the old commits. A pushed secret is revoked or rotated at once,
