@@ -30,12 +30,10 @@ Versions, releases and taking a new upstream release are in
 
 ## Writing code
 
-- Code here imitates the maintainer's own style exactly: copy the shapes of the
-  neighboring code (Dhole's House importer, `journalStyle`, `eras`), JSDoc on
-  every method, `typeof x === 'undefined'` checks, `foundry.utils.setProperty`
-  with dotted paths, `/* // FoundryVTT V13 */` markers on code kept for the
-  oldest Foundry release supported. Add no UI strings unless asked; any new key
-  goes in `en.json` only.
+- The fork's own path-scoped rule `.claude/rules/coc7-foundryvtt-code.md`, the
+  maintainer's style and where UI strings go, loads when a source file, template
+  or language file is read or edited; read it before writing code (diary
+  decision 2026-11-19: the fork's code style in a path-scoped rule).
 - Before every commit: `npx eslint --fix` on the changed files only (never the
   whole tree), then `npm run eslint` with zero errors and zero warnings,
   `npx cspell` on the changed files against `cspell.json`, `npm test`, and
