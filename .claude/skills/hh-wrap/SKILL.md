@@ -129,17 +129,20 @@ conversation; anything that needs a choice is for the operator.
 - List each exception to a check added since the base that cites no diary
   decision, since an exception needs the operator's agreement and the diary is
   where that shows. Read the lines `git diff -U0 <base>` adds to `prek.toml`,
-  `ruff.toml` and `pyproject.toml`: `exclude` values in `prek.toml`, ruff's
-  `extend-per-file-ignores` and `ignore`, and pyright's `executionEnvironments`.
-  A line the diff adds is not always a new exception, since a line rewritten for
-  another reason shows as added: compare each exception's value with the same
-  hook's or setting's at the base (`git show <base>:<file>`), and leave out one
-  whose value is unchanged. Leave out too an `exclude` equal to the same hook's
-  in hh-rules' own file at the project's pinned tag, the tag in
-  `rulesync.jsonc`: `git -C ~/git/hh-rules show <tag>:prek/base.toml`, or
-  `prek/format.toml`, `prek/fork.toml` or `prek/<pack>.toml` for a hook of
-  theirs. Report each one left with no `(diary decision …)` beside it as a
-  finding (diary decision 2026-11-09: the wrap lists uncited exceptions).
+  for its `exclude` values, and to the files where each rules pack the project
+  installs puts its exceptions, as its rule says: for `python`, ruff's
+  `extend-per-file-ignores` and `ignore` in `ruff.toml` and pyright's
+  `executionEnvironments` in `pyproject.toml`; for `typescript`,
+  `eslint.config.js`, `tsconfig.json` and the knip config. A line the diff adds
+  is not always a new exception, since a line rewritten for another reason shows
+  as added: compare each exception's value with the same hook's or setting's at
+  the base (`git show <base>:<file>`), and leave out one whose value is
+  unchanged. Leave out too an `exclude` equal to the same hook's in hh-rules'
+  own file at the project's pinned tag, the tag in `rulesync.jsonc`:
+  `git -C ~/git/hh-rules show <tag>:prek/base.toml`, or `prek/format.toml`,
+  `prek/fork.toml` or `prek/<pack>.toml` for a hook of theirs. Report each one
+  left with no `(diary decision …)` beside it as a finding (diary decision
+  2026-11-09: the wrap lists uncited exceptions).
 
 - Fix these, with any diary entry in today's file:
 
@@ -281,3 +284,9 @@ conversation; anything that needs a choice is for the operator.
   say. The wrap does not push on its own, and an unanswered question is not
   raised again before the next wrap (diary decision 2026-11-08: when a push is
   asked about).
+- If work since the last release cannot be tried until a release, end the report
+  by saying so and asking once whether to make one. The question is the
+  operator's even while supervising, since supervising does not extend to a
+  release. The wrap makes no release, and an unanswered question is not raised
+  again before the next wrap (diary decision 2026-11-19: releases at the
+  operator's go-ahead, asked once at the wrap).

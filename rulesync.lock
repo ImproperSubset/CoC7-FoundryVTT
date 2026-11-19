@@ -2,18 +2,18 @@
   "lockfileVersion": 1,
   "sources": {
     "impropersubset/hh-rules": {
-      "requestedRef": "v0.26.0",
-      "resolvedRef": "ddeb5cc550e27b4489b6111dcd1046eb91f603f2",
-      "resolvedAt": "2026-11-19T17:36:06.880Z",
+      "requestedRef": "v0.27.0",
+      "resolvedRef": "549d725b8564ffbaa97e340403e991223cd0b302",
+      "resolvedAt": "2026-11-19T22:03:55.766Z",
       "skills": {
         "hh-dedupe": {
-          "integrity": "sha256-894987f277e8e123c2d33bc3823b4f34de713a6db4fb47cf965400f24295e485"
+          "integrity": "sha256-cb0cee8371190f3ebe237ae9c98b5580bb336b47e5a9bc30a0e192c973d02bfc"
         },
         "hh-drift": {
           "integrity": "sha256-c29dbc770ed1e7899e6644e091e2264763dc721dcdb8366c64272d8d092b750b"
         },
         "hh-wrap": {
-          "integrity": "sha256-bbcbb5664fd6f4f3cfe9618aa5c43d8cc90a464198d5b3b2854d828b30d5d734"
+          "integrity": "sha256-f720d27e64a2038b0874b24bd22fab5db7cdd0cec399173d0fa4cc6e82c241eb"
         }
       },
       "skillSelection": [
@@ -58,7 +58,7 @@
     "kucherenko/jscpd": {
       "requestedRef": "v5.4.1",
       "resolvedRef": "095d6ca33e9f291c144bb05ef653b2bfdc3c1453",
-      "resolvedAt": "2026-11-19T17:36:07.749Z",
+      "resolvedAt": "2026-11-19T22:03:56.552Z",
       "skills": {
         "dry-refactoring": {
           "integrity": "sha256-74527e92b67366feb4add0c167c502d5d8d0c405a784daf4e24c4f7d73fda119"

@@ -49,7 +49,7 @@ the end of two functions that do different things, is left and reported.
   the clone. Where it says to run jscpd, run `.hh/shared/hh-clones` with the
   same `--test` globs and the same jscpd flags after `--` instead, so the check
   uses the pinned version and the project's exclusions. That check, the set gone
-  or smaller and no new set, takes the place of its last step's duplication
+  or smaller and no new set, takes the place of its step 8's duplication
   percentage, which `hh-clones` does not print; the commit check prints it. Its
   triage and its strategies apply as written. An extracted function goes in a
   module its callers already import from, where there is one, before a new
