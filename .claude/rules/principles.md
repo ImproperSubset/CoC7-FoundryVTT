@@ -362,8 +362,17 @@ How Claude and the operator work together on this project.
 
 - A secret never goes into a repository in plain text, and its value never
   appears on a command line or in output.
-- A command that needs a secret runs sandboxed, where the sandbox masks it, and
-  reads it from its file or variable rather than from a pasted value.
+- A command that needs a secret reads it from its file or variable rather than
+  from a pasted value.
+- A command that uses a secret the sandbox masks runs sandboxed: outside the
+  sandbox it reads the real value, and the secret enters the session (diary
+  decision 2026-11-21: secrets masked by the sandbox, the gh login excepted).
+- The credential files a session has no use for are denied to it, not masked: a
+  `permissions.deny` list in the project's `.claude/settings.json`, and the same
+  list in the user settings, refuses a read of `~/.ssh`, `~/.aws/credentials`,
+  `~/.gnupg`, `~/.netrc` and `~/.claude/.credentials.json` by Claude's tools,
+  and a Bash command that names one. It does not refuse writing to them (diary
+  decision 2026-11-20: credential deny rules in project and user settings).
 - A secret a session can read unmasked, found in any file, variable or log, is
   raised with the operator at once, with its location and what uses it, and
   settled with them: retired if nothing uses it, otherwise blocked or masked in
@@ -375,6 +384,20 @@ How Claude and the operator work together on this project.
 ## Git
 
 - Local commits are free.
+- A session working in a git worktree of the project, as a background session
+  does, sets the worktree up before its first change, since a worktree holds
+  only tracked files. It installs the dependencies its rules packs name. It
+  brings in the ignored files its work reads: Claude Code copies into a new
+  worktree the ignored files that a `.worktreeinclude` file at the project's
+  root lists, which the project commits, but no symbolic link, so a link is
+  copied from the checkout, the first folder `git worktree list` prints, with
+  `cp -P` (diary decision 2026-11-20: a worktree set up before work).
+- A session that works on a branch of its own hands its finished work over as a
+  pull request against the project's working branch, and never merges it: the
+  operator merges it, or the hh-advise session while supervising. The task that
+  asked for the work is the go-ahead to push that one branch, in a private
+  repository (diary decision 2026-11-20: a client's branches merged as pull
+  requests by the advisor).
 - A push needs the operator's go-ahead, unless the project has standing
   permission to push. While the hh-advise session supervises the project at the
   operator's `/hh-supervise`, its go-ahead stands for the operator's, for a push

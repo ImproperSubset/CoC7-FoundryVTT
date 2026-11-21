@@ -28,10 +28,10 @@ The Bash tool runs commands in the operator's zsh, with the operator's options.
   the path literally, or guard each variable with `${dir:?}`, which aborts the
   command when it is empty.
 - **Path modifiers can trip Claude Code's deletion check.** A command using
-  `:t`, `:r` or `:h`, as in `${${f:t}:r}`, has been refused as a removal with a
-  target it cannot resolve, though it deleted nothing. Use `basename` and
-  `dirname` instead (diary decision 2026-11-06: deletions and path modifiers in
-  zsh commands).
+  `:t`, `:r` or `:h`, as in `${${f:t}:r}`, is refused as a removal with a target
+  it cannot resolve, though it deleted nothing. Use `basename` and `dirname`
+  instead (diary decision 2026-11-06: deletions and path modifiers in zsh
+  commands).
 - **`status` is a read-only variable**: `status=$(...)` fails. Use another name,
   such as `rc`.
 - **`path` is tied to `PATH`**: assigning `path=...` replaces `PATH`. Use

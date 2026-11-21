@@ -84,6 +84,8 @@
       "unticked",
       "webp",
       "webpackbar",
+      "worktreeinclude",
+      "worktrees",
       "Xtrm"
     ],
     // flagWords - list of words to be always considered incorrect
