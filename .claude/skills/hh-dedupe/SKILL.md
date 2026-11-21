@@ -51,9 +51,10 @@ the end of two functions that do different things, is left and reported.
   uses the pinned version and the project's exclusions. That check, the set gone
   or smaller and no new set, takes the place of its step 8's duplication
   percentage, which `hh-clones` does not print; the commit check prints it. Its
-  triage and its strategies apply as written. An extracted function goes in a
-  module its callers already import from, where there is one, before a new
-  utility file.
+  triage and its strategies apply as written. The jscpd skills' links to other
+  jscpd skills and their `npx skills add` lines do not apply: `/hh-rules` pins
+  the two skills a project uses. An extracted function goes in a module its
+  callers already import from, where there is one, before a new utility file.
 - **test**: use the test framework's own tools, which the rules pack names:
   repeated setup becomes a fixture or setup hook named for what it sets up;
   tests whose bodies match and whose data differs become one parametrized test

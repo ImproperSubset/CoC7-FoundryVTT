@@ -139,4 +139,7 @@ paths:
 
 - An entry written by `/hh-wrap` carries the `Metrics:` paragraph that
   `hh-metrics` prints, word for word, so the next wrap can compare against it,
-  and ends with `Wrapped at <commit>`, the commit the wrap started from.
+  and ends with `Wrapped at <commit>`, the commit the wrap started from. What
+  comes after the wrap, such as a go-ahead given once its entry is written, is a
+  dated entry of its own, never a line added below `Wrapped at` (diary decision
+  2026-11-20: what follows a wrap is its own diary entry).

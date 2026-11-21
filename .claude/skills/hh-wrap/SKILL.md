@@ -16,7 +16,14 @@ Works in the current project, which keeps a diary in `diary/` (format in the
 
 - The current diary file is today's, `diary/<today's date>.md`, created if it
   does not exist (format in the `diary` rule).
-- The base commit is the most recent `Wrapped at <commit>` line:
+- A session working on a branch of its own, as a background session does in its
+  worktree, takes as the base the commit where its branch last met the project's
+  working branch: `git merge-base HEAD origin/<working branch>`, after a
+  `git fetch origin`. The last `Wrapped at` line in the diary is not its base:
+  where sessions' entries were joined by a union merge, that line can be another
+  session's, in either order (diary decision 2026-11-20: a branch's wrap starts
+  where it left the working branch).
+- Any other session's base commit is the most recent `Wrapped at <commit>` line:
   `command grep -h "^Wrapped at " diary/*.md | tail -1` (the shell sorts the
   date-named files, and GNU grep keeps that order; `grep -r` and the Bash tool's
   own `grep` function do not). With none, use the parent of the first commit

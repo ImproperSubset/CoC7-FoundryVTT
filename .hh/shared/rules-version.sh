@@ -35,11 +35,12 @@ while IFS=$'\t' read -r source ref; do
     # release hh-rules pins, and move only when hh-rules does.
     [[ "$(basename "${source%.git}")" == "hh-rules" ]] || continue
     name="$(basename "${source%.git}")"
-    # A test tag carries a "-" and is never pushed, so the newest pushed tag
-    # says nothing about it: a trial clone would be told to move back (diary
-    # decision 2026-11-13: a test tag pin not compared with the newest tag).
+    # A trial pins a branch of hh-rules, trial-<release>, whose name carries a
+    # "-" as no release tag does. The newest tag says nothing about it: a
+    # trial would be told to move back (diary decision 2026-11-20: a trial
+    # branch pin not compared with the newest tag).
     if [[ "${ref}" == *-* ]]; then
-        lines+=("${name} pinned at test tag ${ref}; the newest tag is not compared")
+        lines+=("${name} pinned at trial branch ${ref}; the newest tag is not compared")
         continue
     fi
     # The lock names a GitHub source by owner/repo alone, which ls-remote
