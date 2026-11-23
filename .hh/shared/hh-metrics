@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # Prints each of the project's metrics as a diary paragraph, and its change
 # since the last such paragraph in the diary: duplication always, and test
-# coverage where the project has a pytest or vitest hook. In a fork, a project
-# with an `upstream` remote, it adds the fork's own copies and the coverage of
-# the lines it changed, both counted from where its branch last met upstream.
-# /hh-wrap puts the paragraphs in its session summary and the changes in its
-# report. Metrics are reported,
-# never judged: this script fails only when it cannot measure.
+# coverage and the tests set aside where the project has a pytest or vitest
+# hook. In a fork, a project with an `upstream` remote, it adds the fork's own
+# copies and the coverage of the lines it changed, both counted from where its
+# branch last met upstream. /hh-wrap puts the paragraphs in its session summary
+# and the changes in its report. Metrics are reported, never judged: this
+# script fails only when it cannot measure.
 #
 # The paragraph is matched with its whitespace collapsed, because mdformat may
 # wrap it across lines.
@@ -41,12 +41,39 @@ done
 dup_now="Metrics: duplication ${clones} clones, ${dup_lines} of ${lines} lines (${dup_pct}%) in ${files} files."
 dup_pattern='Metrics: duplication [0-9]+ clones, [0-9]+ of [0-9]+ lines \([0-9.]+%\) in [0-9]+ files\.'
 
+# Prints the number a test runner's summary gives before the word, or 0 where
+# the summary has no such count, as when no test was skipped.
+count() {
+    if [[ "$1" =~ (^|[^0-9])([0-9]+)\ $2([^a-z]|$) ]]; then
+        echo "${BASH_REMATCH[2]}"
+    else
+        echo 0
+    fi
+}
+
+# A runner's output with its colour codes taken out, since a project may have
+# its runner print in colour, and the codes split the words read below (diary
+# decision 2026-11-22: runners' colour codes stripped, not turned off).
+plain() {
+    sed -E $'s/\x1b\\[[0-9;]*[A-Za-z]//g'
+}
+
 # Coverage through the project's pytest hook, when it has one (the Python
 # pack). The TOTAL row of pytest-cov's report gives statements, missed and the
 # percentage.
 cov_now=""
+skip_now=""
+skip_pattern='Metrics: pytest set aside [0-9]+ skipped, [0-9]+ xfailed, [0-9]+ xpassed\.'
 cov_pattern='Metrics: coverage [0-9]+% of [0-9]+ statements, [0-9]+ missed\.'
-out="$(prek run .:pytest --all-files 2>&1)"
+# pytest 9 counts a skipped or xfailed subtest in its summary line as skipped or
+# xfailed only where its subtest verbosity is not 0. That verbosity defaults to
+# pytest's own, which is 0 in the commit check's run, so it is raised here. On
+# an earlier pytest the pytest-subtests plugin counts a skipped one as skipped
+# and an xfailed one as `subtests xfailed`, and ignores the option (diary
+# decision 2026-11-22: subtests counted as tests set aside, under pytest 9 and
+# the plugin).
+out="$(PYTEST_ADDOPTS="${PYTEST_ADDOPTS:-} -o verbosity_subtests=1" \
+    prek run .:pytest --all-files 2>&1 | plain)"
 if ! grep -q 'did not match any hooks' <<<"${out}"; then
     rows="$(grep -E '^[[:space:]]*TOTAL[[:space:]]' <<<"${out}")"
     read -r _ statements missed percent _ <<<"${rows##*$'\n'}"
@@ -55,14 +82,31 @@ if ! grep -q 'did not match any hooks' <<<"${out}"; then
         exit 1
     fi
     cov_now="Metrics: coverage ${percent} of ${statements} statements, ${missed} missed."
+    # The tests pytest set aside, from its summary line: those it skipped, and
+    # those a mark expected to fail, whether they failed or passed. /hh-wrap
+    # raises each with the operator (diary decision 2026-11-22: tests set aside
+    # counted by the test runner, each raised once).
+    summary="$(grep -E '^[[:space:]]*(=+ )?(no tests ran|[0-9]+ [a-z]+( [a-z]+)*(, [0-9]+ [a-z]+( [a-z]+)*)*) in [0-9.]+s' <<<"${out}")"
+    if [[ -z "${summary}" ]]; then
+        printf 'hh-metrics: no summary line in the output of prek run .:pytest:\n%s\n' "${out}" >&2
+        exit 1
+    fi
+    summary="${summary##*$'\n'}"
+    skipped="$(count "${summary}" skipped)"
+    xfailed="$(count "${summary}" xfailed)"
+    xfailed=$((xfailed + $(count "${summary}" 'subtests xfailed')))
+    xpassed="$(count "${summary}" xpassed)"
+    skip_now="Metrics: pytest set aside ${skipped} skipped, ${xfailed} xfailed, ${xpassed} xpassed."
 fi
 
 # Coverage through the project's vitest hook, when it has one (the TypeScript
 # pack). The Statements row of Vitest's text-summary report gives the
 # percentage, the statements covered and the total.
 vcov_now=""
+vskip_now=""
+vskip_pattern='Metrics: Vitest set aside [0-9]+ skipped, [0-9]+ todo\.'
 vcov_pattern='Metrics: Vitest coverage [0-9.]+% of [0-9]+ statements, [0-9]+ missed\.'
-out="$(prek run .:vitest --all-files 2>&1)"
+out="$(prek run .:vitest --all-files 2>&1 | plain)"
 if ! grep -q 'did not match any hooks' <<<"${out}"; then
     row="$(grep -E '^[[:space:]]*Statements[[:space:]]*:' <<<"${out}")"
     if [[ ! "${row##*$'\n'}" =~ :[[:space:]]*([0-9.]+%)[[:space:]]*\([[:space:]]*([0-9]+)/([0-9]+)[[:space:]]*\) ]]; then
@@ -73,6 +117,17 @@ if ! grep -q 'did not match any hooks' <<<"${out}"; then
     vcovered="${BASH_REMATCH[2]}"
     vtotal="${BASH_REMATCH[3]}"
     vcov_now="Metrics: Vitest coverage ${vpercent} of ${vtotal} statements, $((vtotal - vcovered)) missed."
+    # The tests Vitest set aside, from its Tests row: those it skipped, which
+    # include those a `.only` left out, and those written as todo.
+    row="$(grep -E '^[[:space:]]*Tests[[:space:]]+[0-9]+ [a-z]+.*\([0-9]+\)[[:space:]]*$' <<<"${out}")"
+    if [[ -z "${row}" ]]; then
+        printf 'hh-metrics: no Tests row in the output of prek run .:vitest:\n%s\n' "${out}" >&2
+        exit 1
+    fi
+    row="${row##*$'\n'}"
+    vskipped="$(count "${row}" skipped)"
+    vtodo="$(count "${row}" todo)"
+    vskip_now="Metrics: Vitest set aside ${vskipped} skipped, ${vtodo} todo."
 fi
 
 # In a fork, the copies upstream's code does not have, as hh-clones lists them,
@@ -154,9 +209,11 @@ excluded="$("${here}/jscpd-run" --exclusions)" || exit 1
 echo "Excluded from duplication: ${excluded:-none}"
 if [[ -n "${cov_now}" ]]; then
     report "${cov_now}" "${cov_pattern}"
+    report "${skip_now}" "${skip_pattern}"
 fi
 if [[ -n "${vcov_now}" ]]; then
     report "${vcov_now}" "${vcov_pattern}"
+    report "${vskip_now}" "${vskip_pattern}"
 fi
 if [[ -n "${fork_dup_now}" ]]; then
     report "${fork_dup_now}" "${fork_dup_pattern}"

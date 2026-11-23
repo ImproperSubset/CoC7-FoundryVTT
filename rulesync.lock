@@ -2,9 +2,9 @@
   "lockfileVersion": 1,
   "sources": {
     "impropersubset/hh-rules": {
-      "requestedRef": "v0.28.2",
-      "resolvedRef": "178867c1a8a611c8bdfad001473a3cc2533ae55d",
-      "resolvedAt": "2026-11-21T18:42:44.633Z",
+      "requestedRef": "v0.30.0",
+      "resolvedRef": "1f7542e51639eb729a9ccb4346bb968bb5d5601b",
+      "resolvedAt": "2026-11-23T00:57:03.290Z",
       "skills": {
         "hh-dedupe": {
           "integrity": "sha256-06cb74b03a17453775d41223787c90ebe841e2469186703803488b64c2e46029"
@@ -13,7 +13,7 @@
           "integrity": "sha256-c29dbc770ed1e7899e6644e091e2264763dc721dcdb8366c64272d8d092b750b"
         },
         "hh-wrap": {
-          "integrity": "sha256-d82763ba61966711af3e610de233cf3ee9c9b62b8cad0c7acc9a1c2da6a79f0e"
+          "integrity": "sha256-cf9fbc1d3717d96f8b7f6b7dcab8802cfea2a914d1c06eda2a41a2f35f00de58"
         }
       },
       "skillSelection": [
@@ -24,13 +24,13 @@
       "skillsPath": "skills",
       "rules": {
         "diary": {
-          "integrity": "sha256-9e78b47fd82d7fe1af2405bd701ee5157589465d7f76ec6073037e3e5a176334"
+          "integrity": "sha256-900c15e2a8d0acba784d3fa19f675f6e699fa6ed17fc77a71b9e62cb228e2686"
         },
         "glossary": {
           "integrity": "sha256-1e7f1fde16a1675bc735681478d32948058a67f8c90b99463394740e218a90c1"
         },
         "principles": {
-          "integrity": "sha256-da87de300e522a283071597a5c54ae27bd20d10f018ea9fb15084da364154d4f"
+          "integrity": "sha256-354b8bae1e20714242227e9eb657685a0cf587a4957c5477119ceafa0f14e6aa"
         },
         "sandbox": {
           "integrity": "sha256-2badd4ac9e15f4f14d4ad60c45a9aac88c4283350fb5f4e6cfcdd47498d71eeb"
@@ -58,7 +58,7 @@
     "kucherenko/jscpd": {
       "requestedRef": "v5.4.1",
       "resolvedRef": "095d6ca33e9f291c144bb05ef653b2bfdc3c1453",
-      "resolvedAt": "2026-11-21T18:42:45.395Z",
+      "resolvedAt": "2026-11-23T00:57:04.038Z",
       "skills": {
         "dry-refactoring": {
           "integrity": "sha256-74527e92b67366feb4add0c167c502d5d8d0c405a784daf4e24c4f7d73fda119"

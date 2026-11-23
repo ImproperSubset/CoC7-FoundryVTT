@@ -135,8 +135,9 @@ How Claude and the operator work together on this project.
 - A project never changes what hh-rules shares with it: a rule, skill, script or
   config. A change it wants goes to the hh-advise session, as a draft with what
   it rests on, when the project is connected to one, and otherwise as an issue
-  on hh-rules. The advisor, or an hh-rules session, reviews, edits and commits
-  it (diary decision 2026-11-05: rules pack skills).
+  on hh-rules. The advisor reviews it, and a client session it starts in
+  hh-rules makes and commits the change (diary decision 2026-11-22: rules pack
+  skills).
 - Nothing of ours goes in `.claude/`, which Anthropic owns and changes, but what
   Claude Code reads only from there: the rules, the skills and `settings.json`.
   hh-rules' copies live in `.hh/shared/` and Claude's reference docs in
@@ -192,10 +193,25 @@ How Claude and the operator work together on this project.
   one is tested once in a fresh session: read a file it covers, without opening
   the rule, and check that the rule loads. A wrong path makes it fail silently.
   The session that wrote the rule runs the test itself, with a headless
-  `claude -p` in the project's folder allowed only to read, asked which rules
-  loaded and when; a rule for other files staying out shows the run loads rules
-  by the file read (diary decision 2026-11-06: a project's own rules, tested
-  headless).
+  `claude -p` in the project's folder, given the Read tool and no other with
+  `--tools Read`, and told to read one file the rule covers. The run is given an
+  `InstructionsLoaded` hook in `--settings`, which logs each rule file as it
+  loads, with `<log>` a file outside the project, so nothing in the project
+  changes. It is started outside the sandbox, inside which a headless session
+  cannot sign in:
+
+  ```shell
+  claude -p "Read <file> with the Read tool and reply done." \
+    --tools Read --settings '{"hooks":{"InstructionsLoaded":[{"hooks":
+    [{"type":"command","command":"jq -c . >> <log>"}]}]}}'
+  ```
+
+  The test counts only where the run exits 0, since a run that fails still logs
+  the rules loaded at its start. It passes when the log holds the new rule with
+  the `load_reason` `path_glob_match` and the file read as its
+  `trigger_file_path`, and holds no rule written for other files. The log is the
+  evidence, not the headless session's account of what loaded (diary decision
+  2026-11-21: the rule-load test read from a hook's log).
 
 - The README is the human interface to the project: what it is and how to use
   it, kept short. It is not a home for Claude's docs (diary decision 2026-10-31:
@@ -217,11 +233,11 @@ How Claude and the operator work together on this project.
   which adds lines for its findings, the session's loose ends and each new copy
   of code, without asking, because it runs as the operator is leaving (diary
   decision 2026-11-04: docs, the plan and the wrap's own lines) (diary decision
-  2026-11-11: wrap fixes procedure and plans the rest); it also removes an item
-  finished in every part and moves a built provisional decision into the diary,
-  so the operator can stop after a wrap with nothing settled lost (diary
-  decision 2026-11-13: provisional decisions in the plan, and what the wrap
-  fixes there).
+  2026-11-22: wrap fixes procedure and plans the rest, a client's findings on
+  other tasks reported); it also removes an item finished in every part and
+  moves a built provisional decision into the diary, so the operator can stop
+  after a wrap with nothing settled lost (diary decision 2026-11-13: provisional
+  decisions in the plan, and what the wrap fixes there).
 
 - The plan is `PLAN.md` at the project root: one list of tasks in the order they
   are to be done, the next first, each a bullet led by its short name in bold. A
@@ -310,8 +326,10 @@ How Claude and the operator work together on this project.
 - A test is never skipped. A test that is wrong is fixed, or deleted with the
   operator's agreement. A skip in the code is raised by `/hh-wrap` for
   discussion, never refused at commit, since a refused skip leaves weakening the
-  test as the cheapest way past; each rules pack gives the markers it searches
-  for (diary decision 2026-11-04: tests set aside flagged at the wrap).
+  test as the cheapest way past. The wrap finds them by the test runner's own
+  count, which `hh-metrics` records, and each rules pack says how its runner
+  counts and lists them (diary decision 2026-11-22: tests set aside counted by
+  the test runner, each raised once).
 - A test or check is never weakened to make it pass without the operator's
   agreement: no loosened assertion, raised timeout, retry, `|| true`, ignored
   exit status or swallowed error.
@@ -325,6 +343,15 @@ How Claude and the operator work together on this project.
   retried until it passes.
 - Before work is reported done, run the tests that cover it and name them in the
   report. Tests not run, or failing, are said first.
+- A test added or changed for a change in behaviour is run against the code as
+  it was before the change, and the report of the work, and the pull request's
+  description where there is one, names each such test, the command that ran it,
+  and that it failed. Two cases are said as what they are: a test that fails
+  there only because it imports what the change added, and a refactoring's
+  tests, which pass on the old code. Where the work is reviewed from the
+  session's transcript, as a client's is by the advisor, the run's real output
+  there is what the review reads (diary decision 2026-11-22: a new test's
+  failing run named in the report and read in the transcript).
 - Match test depth to the cost of a wrong answer.
 - Test code is held to the standard of the code it tests: the same type checks
   and lint rules, with exceptions only where a test truly differs, such as
@@ -365,14 +392,19 @@ How Claude and the operator work together on this project.
 - A command that needs a secret reads it from its file or variable rather than
   from a pasted value.
 - A command that uses a secret the sandbox masks runs sandboxed: outside the
-  sandbox it reads the real value, and the secret enters the session (diary
-  decision 2026-11-21: secrets masked by the sandbox, the gh login excepted).
+  sandbox it reads the real value, and the secret enters the session. The
+  operator's GitHub login is not masked, so this rule does not reach a command
+  that uses it, such as `gh` or `git` (diary decision 2026-11-21: secrets masked
+  by the sandbox, the gh login excepted).
 - The credential files a session has no use for are denied to it, not masked: a
   `permissions.deny` list in the project's `.claude/settings.json`, and the same
   list in the user settings, refuses a read of `~/.ssh`, `~/.aws/credentials`,
-  `~/.gnupg`, `~/.netrc` and `~/.claude/.credentials.json` by Claude's tools,
-  and a Bash command that names one. It does not refuse writing to them (diary
-  decision 2026-11-20: credential deny rules in project and user settings).
+  `~/.gnupg`, `~/.netrc` and `~/.claude/.credentials.json` by Claude's file
+  tools, and in a Bash command a redirection from one or a file command Claude
+  Code recognizes that names one, such as `cat`, `head`, `tail`, `sed` and
+  `tee`. It does not refuse another program that reads one, such as `ssh-keygen`
+  or `tar`, nor writing to them (diary decision 2026-11-20: credential deny
+  rules in project and user settings).
 - A secret a session can read unmasked, found in any file, variable or log, is
   raised with the operator at once, with its location and what uses it, and
   settled with them: retired if nothing uses it, otherwise blocked or masked in
@@ -394,36 +426,41 @@ How Claude and the operator work together on this project.
   `cp -P` (diary decision 2026-11-20: a worktree set up before work).
 - A session that works on a branch of its own hands its finished work over as a
   pull request against the project's working branch, and never merges it: the
-  operator merges it, or the hh-advise session while supervising. The task that
-  asked for the work is the go-ahead to push that one branch, in a private
-  repository (diary decision 2026-11-20: a client's branches merged as pull
-  requests by the advisor).
-- A push needs the operator's go-ahead, unless the project has standing
-  permission to push. While the hh-advise session supervises the project at the
-  operator's `/hh-supervise`, its go-ahead stands for the operator's, for a push
-  and for raising publishing below (diary decision 2026-11-14: supervising
-  started and ended by the operator, with a log). A session asks about a routine
-  push once, at the wrap, and does not list it among what is waiting or raise it
-  in other turns, unless the work cannot go on without it (diary decision
-  2026-11-08: when a push is asked about). Secrets, the operator's identity and
-  the operator's infrastructure, such as hostnames, domains and addresses, are
-  checked by the commit hooks on what each commit adds, and `/hh-rules` scans
-  every file at setup and at each update, so a push to a private repository
-  needs no review of its own (diary decision 2026-11-12: identity covered at
-  commit and by a scan at each update) (diary decision 2026-11-15: secrets and
-  infrastructure reviewed at publishing).
-- Publishing what Claude wrote, or the files that direct Claude (rules, skills,
-  `CLAUDE.md`, the plan and the diary), in a public repository is raised with
-  the operator first: a push to a public repository, a new public repository, or
-  a change of visibility. Before raising it, read everything that would become
-  public, the history included, for secrets and infrastructure details the hooks
-  do not know, such as a secret in a format gitleaks lacks or a server not in
-  the operator's patterns (diary decision 2026-11-15: secrets and infrastructure
-  reviewed at publishing). Projects are private unless the operator decides
-  otherwise, and their releases are installed with the operator's login, such as
+  operator merges it, or the hh-advise session while supervising. Its wrap
+  pushes that one branch, as below, and the session then opens the pull request
+  (diary decision 2026-11-21: a client's branches merged as pull requests by the
+  advisor).
+- A push needs the operator's go-ahead, and the wrap is one: `/hh-wrap`, once
+  its commit is made, pushes the branch it wrapped to the same branch on the
+  project's remote, and nothing else: no tag, no release and no forced push. A
+  push the remote refuses, such as one to a branch that has moved on, is
+  reported and left. Outside a wrap a session does not push, and does not ask
+  to, unless the work cannot go on without it. While the hh-advise session
+  supervises the project, its go-ahead stands for the operator's, for a push and
+  for raising publishing below (diary decision 2026-11-22: the advisor
+  supervises from its launch, within a scope settled at the start) (diary
+  decision 2026-11-21: a push made by the wrap). Secrets, the operator's
+  identity and the operator's infrastructure, such as hostnames, domains and
+  addresses, are checked by the commit hooks on what each commit adds, and
+  `/hh-rules` scans every file at setup and at each update, so a push to a
+  private repository needs no review of its own (diary decision 2026-11-12:
+  identity covered at commit and by a scan at each update) (diary decision
+  2026-11-15: secrets and infrastructure reviewed at publishing).
+- A push to a public repository publishes what Claude wrote and the files that
+  direct Claude (rules, skills, `CLAUDE.md`, the plan and the diary). Before
+  one, the wrap's included, the session reads everything the push would make
+  public, the commits the remote lacks with their changes, for secrets and
+  infrastructure details the hooks do not know, such as a secret in a format
+  gitleaks lacks or a server not in the operator's patterns. It pushes only
+  where it finds none, and what it finds goes to the operator (diary decision
+  2026-11-15: secrets and infrastructure reviewed at publishing). A new public
+  repository, or a change of visibility, is raised with the operator first,
+  after the same read of everything that would become public, the history
+  included. Projects are private unless the operator decides otherwise, and
+  their releases are installed with the operator's login, such as
   `gh release download` onto the operator's own server, from which a tool that
-  cannot log in, like Foundry, installs (diary decision 2026-11-05: publishing
-  raised with the operator).
+  cannot log in, like Foundry, installs (diary decision 2026-11-21: publishing
+  to a public repository).
 - A release needs the operator's go-ahead, as a push does, and supervising does
   not extend to one. A session may say that work can't be tried until a release.
   It asks about making one once, at the wrap, and does not list it among what is

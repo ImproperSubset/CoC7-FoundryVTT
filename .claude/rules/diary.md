@@ -41,6 +41,13 @@ paths:
 - Any other notable event can have its own entry, with a dated heading and plain
   prose.
 
+- A mistake gets an entry only where the entry does a job: it corrects something
+  an earlier entry states wrongly, records a decision made in the operator's
+  stead, or gives a result. A slip that left nothing wrong in the records gets
+  none, and neither does who found it. A lesson worth keeping goes where it
+  acts: a rule, a skill or a check (diary decision 2026-11-21: which mistakes
+  the diary records).
+
 - A decision is its own entry, a diary decision, marked so it can be found by
   grep (diary decision 2026-10-31: recording history and decisions):
 

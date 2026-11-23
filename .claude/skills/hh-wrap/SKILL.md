@@ -60,10 +60,11 @@ Works in the current project, which keeps a diary in `diary/` (format in the
 ## 3. Clean the docs
 
 - In the lines this session added to docs and comments (Markdown files outside
-  `diary/`, less the rule files rulesync generates, which `rulesync.lock` lists
-  as `resolvedRuleNames`, and comments in changed code), find history: dates,
-  counts that will go stale, "previously", "used to", "was changed", and
-  accounts of how something came to be.
+  `diary/`, less the rule files and the pinned skills rulesync generates, which
+  `rulesync.lock` lists as `resolvedRuleNames` and under `skills`, and comments
+  in changed code), find history: dates, counts that will go stale,
+  "previously", "used to", "was changed", and accounts of how something came to
+  be.
 - Rewrite each so it states what is. Move any history worth keeping into the
   diary entry. A reason that prevents a future edit stays.
 - In the same lines, find what is not yet true: a TODO or an intended behaviour
@@ -123,16 +124,6 @@ conversation; anything that needs a choice is for the operator.
   2026-11-05: the plan as an ordered task list) (diary decision 2026-11-13:
   provisional decisions in the plan, and what the wrap fixes there).
 
-- Find each test this session skipped or narrowed in code. In the lines
-  `git diff <base>` adds to the test files, which `/hh-dedupe` names in its step
-  1, search for the skip markers each rules pack the project installs gives in
-  its rule:
-  `git diff -U0 <base> -- ':(glob)<test glob>' | command grep -E '^\+\+\+ |<markers>'`,
-  then read each match in its file. Report each skip as a finding with its file
-  and test. A skip is never removed here: whether the test is fixed, deleted or
-  kept skipped is the operator's to decide (diary decision 2026-11-04: tests set
-  aside flagged at the wrap).
-
 - List each exception to a check added since the base that cites no diary
   decision, since an exception needs the operator's agreement and the diary is
   where that shows. Read the lines `git diff -U0 <base>` adds to `prek.toml`,
@@ -178,7 +169,8 @@ conversation; anything that needs a choice is for the operator.
   new doc line is the operator's intent and so is a judgement that none is
   needed. For each, say whether a doc should carry it, and where, or why it
   needs none. Every plan finding not fixed above, every line found in section 3
-  not yet true, every skip and every uncited exception is left too.
+  not yet true, every uncited exception, and every test set aside that section 6
+  finds, is left too.
 
 - After fixing, run the mechanical checks again.
 
@@ -191,12 +183,21 @@ conversation; anything that needs a choice is for the operator.
   other is a line of its own at the top of the plan's list of work, above every
   other item. The line says what was found, where, and the change proposed, so
   it can be settled without the diary. An earlier wrap's lines stay. The commit
-  that settles a finding removes its line (diary decision 2026-11-11: wrap fixes
-  procedure and plans the rest).
+  that settles a finding removes its line (diary decision 2026-11-22: wrap fixes
+  procedure and plans the rest, a client's findings on other tasks reported).
 
   ```markdown
   - **Wrap finding**: <what was found and where>. Proposed: <the change>.
   ```
+
+- A client, a session in a worktree of its own that works with an advisor
+  through `/hh-connect`, adds its own `Wrap finding` and `Loose end` lines as
+  this skill asks, and changes no other session's task, since another session
+  may be changing it: a finding that belongs to another task goes in its report
+  to the advisor, not into that task, and the summary entry says so. A session
+  on the project's checkout adds it to the task as above (diary decision
+  2026-11-22: wrap fixes procedure and plans the rest, a client's findings on
+  other tasks reported).
 
 ## 5. Put the session's loose ends in the plan
 
@@ -212,8 +213,9 @@ conversation; anything that needs a choice is for the operator.
 
 - Each goes into the plan, with no agreement asked: one that belongs to a task
   already there is added to that task, saying what is to be done; any other is a
-  line of its own beside the `Wrap finding` lines. The commit that settles it
-  removes it.
+  line of its own beside the `Wrap finding` lines. A client's loose end that
+  belongs to another task goes in its report to the advisor instead, as section
+  4 says of a finding. The commit that settles it removes it.
 
   ```markdown
   - **Loose end**: <what is undone, who it is owed to or waits on, and what
@@ -234,6 +236,23 @@ conversation; anything that needs a choice is for the operator.
 
 - Put the `Change:` lines first in the report, ahead of everything else, each
   with its `Metrics:` line beside it, and the exclusions after them.
+
+- Find the tests set aside in the whole project, not only those this session
+  touched. Each rules pack the project installs whose test runner is among the
+  project's commit checks gives its `Metrics:` line the runner's count of them,
+  which its rule names, with what the runner counts and does not, and the
+  command that lists each such test. Where a count is above 0, run that command,
+  and list each test it gives, with its file, in the session summary entry,
+  under `Tests set aside:`, so the next wrap can compare. Each test on the list
+  that the last such list in the diary does not hold is a finding, left for the
+  operator as section 4 says and put in the plan the same way, unless a line
+  there already holds it; a test the last list holds was raised before, and is
+  listed again but not raised, so a test the operator agreed to keep is raised
+  once. A test set aside is never changed here: whether it is fixed, deleted or
+  kept as it is, is the operator's to decide. Where such a pack's line is
+  missing, or `hh-metrics` failed, the report says the tests set aside were not
+  counted (diary decision 2026-11-22: tests set aside counted by the test
+  runner, each raised once).
 
 - List the duplication new since step 1's base: `.hh/shared/hh-clones` in a
   project, or `bin/hh-clones` in hh-rules itself, with `--since <base>` and the
@@ -277,20 +296,44 @@ conversation; anything that needs a choice is for the operator.
 ## 8. Commit
 
 - Append `Wrapped at <commit noted in step 1>` to the session summary entry.
+
 - Stage the diary files, the cleaned docs, the docs whose citations step 4 fixed
   and the plan by explicit path, and commit locally:
-  `Wrap: diary and doc cleanup`. Do not push.
-- Report: the metrics from step 6, then entries written, docs cleaned, the
-  commit hash, step 4's findings, each with where it is and whether it was fixed
-  or added to the plan, step 5's loose ends, each with where it went in the
-  plan, and step 7's tasks that may be moot and tasks to settle, each with its
-  question; or, for each, that it found none.
-- If the branch has commits its upstream lacks, and the project has no standing
-  permission to push, end the report by naming how many and asking once whether
-  to push; a push that publishes, as the principles define it, is raised as they
-  say. The wrap does not push on its own, and an unanswered question is not
-  raised again before the next wrap (diary decision 2026-11-08: when a push is
-  asked about).
+  `Wrap: diary and doc cleanup`.
+
+- Push the branch. Run `.hh/shared/hh-push-check` in a project, or
+  `bin/hh-push-check` in hh-rules itself, and act on its first line, which is
+  one of three:
+
+  - `push:`, with exit 0: the repository `origin` names is private. Run the
+    `git push origin <branch>` it prints, with no read.
+  - `read first:`, with exit 3: the repository is public, or its visibility
+    could not be read. Read everything the push would make public, as the
+    principles say, with the two commands it prints, each in a call of its own:
+    `git fetch --prune origin`, so the remote's branches are known as they now
+    are, a deleted one no longer among them, and
+    `git log -p --cc <branch> --not --remotes=origin`, which gives the commits
+    no branch of the remote holds, a merge's own changes among them. Run the
+    push it prints only where both commands exit 0 and the read shows no secret
+    and no infrastructure detail; otherwise do not push.
+  - `no push:`, with exit 2: the project has no remote named `origin`, the wrap
+    is on no branch, or one of the script's other refusals, which the line
+    names. Push nothing.
+
+  Any other first line or exit, or a missing script, is no answer: do not push.
+  Push nothing else: no tag, and never with force. A push with nothing new
+  changes nothing. Where the remote refuses the push, do not retry it another
+  way (diary decision 2026-11-21: a push made by the wrap) (diary decision
+  2026-11-22: the wrap's push check a script, a search for nothing left prose).
+
+- Report: the metrics from step 6 and the tests set aside it found, or that it
+  could not count them, then entries written, docs cleaned, the commit hash,
+  step 4's findings, each with where it is and whether it was fixed or added to
+  the plan, step 5's loose ends, each with where it went in the plan, and step
+  7's tasks that may be moot and tasks to settle, each with its question; or,
+  for each, that it found none; and what was pushed, or why nothing was, with
+  what the read found where it stopped the push.
+
 - If work since the last release cannot be tried until a release, end the report
   by saying so and asking once whether to make one. The question is the
   operator's even while supervising, since supervising does not extend to a
