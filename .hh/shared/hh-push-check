@@ -1,0 +1,91 @@
+#!/usr/bin/env bash
+# Says whether /hh-wrap may push the branch it wrapped with no read of what the
+# push would publish, so that the answer does not rest on a session's reading
+# of a step. The read itself, of the commits for a secret or an infrastructure
+# detail, stays the session's, since it is a judgement.
+#
+#   hh-push-check
+#
+# Run from the project. It prints its answer on the first line, and under it
+# the commands that follow from it:
+#
+#   push: ...        exit 0  the repository origin pushes to is private or
+#                            internal: push, with no read
+#   read first: ...  exit 3  anything else: the repository is public, gh gave
+#                            another answer, or gh failed
+#   no push: ...     exit 2  the project has no remote named origin, HEAD is
+#                            on no branch, the branch's name holds a character
+#                            a shell would act on, origin pushes to another
+#                            address than it fetches from, or origin has more
+#                            than one address
+#
+# Only a visibility read as PRIVATE or INTERNAL allows a push with no read: a
+# gh that fails gives no answer, and no answer is not a private repository.
+# The repository is named to gh by origin's address, because in a fork a bare
+# `gh repo view` may read upstream's. Where origin pushes to another address
+# than it fetches from, the read below, which leaves out what origin's fetched
+# branches hold, would not show what the push publishes, so nothing is pushed.
+# The branch's name goes into the commands printed, so one a shell would act on
+# is refused. A name and password written into the address are left out of what
+# is printed and of what gh is given (diary decision 2026-11-21: a push made by
+# the wrap).
+set -uo pipefail
+
+if ! branch="$(git symbolic-ref --quiet --short HEAD)"; then
+    echo "no push: HEAD is on no branch"
+    exit 2
+fi
+if [[ ! "${branch}" =~ ^[A-Za-z0-9._/-]+$ ]]; then
+    echo "no push: the branch's name holds a character a shell would act on"
+    exit 2
+fi
+if ! url="$(git remote get-url --push origin 2>/dev/null)"; then
+    echo "no push: the project has no remote named origin"
+    exit 2
+fi
+if ! fetched="$(git remote get-url origin 2>/dev/null)" ||
+    [[ "${url}" != "${fetched}" ]]; then
+    echo "no push: origin pushes to another address than it fetches from"
+    exit 2
+fi
+# A push goes to every address origin has, and gh is asked about one.
+if ! all="$(git remote get-url --all --push origin 2>/dev/null)" ||
+    [[ "${all}" != "${url}" ]]; then
+    echo "no push: origin has more than one address"
+    exit 2
+fi
+if [[ "${url}" =~ ^([A-Za-z][A-Za-z0-9+.-]*://)[^/@]*@(.*)$ ]]; then
+    url="${BASH_REMATCH[1]}${BASH_REMATCH[2]}"
+fi
+
+ask=(gh repo view "${url}" --json visibility --jq .visibility)
+
+# gh's own messages are kept out of its answer: a warning beside a good answer
+# is not part of it. Where gh fails it is asked once more, for its message.
+if visibility="$("${ask[@]}" 2>/dev/null)"; then
+    case "${visibility}" in
+    PRIVATE | INTERNAL)
+        word=private
+        [[ "${visibility}" == PRIVATE ]] || word=internal
+        echo "push: ${url} is ${word}, so the push needs no read"
+        echo "  git push origin ${branch}"
+        exit 0
+        ;;
+    PUBLIC)
+        why="${url} is public"
+        ;;
+    *)
+        why="gh gave no visibility it knows for ${url}: ${visibility:-nothing}"
+        ;;
+    esac
+else
+    message="$("${ask[@]}" 2>&1 >/dev/null | tr '\n' ' ')"
+    message="${message% }"
+    why="gh could not read the visibility of ${url}: ${message:-no message}"
+fi
+
+echo "read first: ${why}"
+echo "  git fetch --prune origin"
+echo "  git log -p --cc ${branch} --not --remotes=origin"
+echo "  git push origin ${branch}"
+exit 3
