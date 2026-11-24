@@ -625,7 +625,7 @@ export default class CoC7ModelsItemDocumentClass extends Item {
    */
   prepareEmbeddedDocuments () {
     super.prepareEmbeddedDocuments()
-    // A weapon's effects not applied to the actor change the weapon itself, such as a penalty die for its attacks
+    // A weapon's effects not applied to the actor change the weapon itself, such as a penalty die for its attacks; other item types are left as upstream's (diary decision 2026-11-23: a weapon's own Active Effects)
     if (this.type === 'weapon') {
       this.applyActiveEffects()
     }
