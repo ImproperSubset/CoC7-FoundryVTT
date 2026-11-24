@@ -288,9 +288,6 @@ export default class CoC7ModelsItemWeaponSystem extends CoC7ModelsItemGlobalSyst
    * @param {string} name
    */
   addBonusDiceEffect (name) {
-    if (typeof this.#bonusDiceEffects === 'undefined') {
-      this.#bonusDiceEffects = []
-    }
     if (!this.#bonusDiceEffects.includes(name)) {
       this.#bonusDiceEffects.push(name)
     }
