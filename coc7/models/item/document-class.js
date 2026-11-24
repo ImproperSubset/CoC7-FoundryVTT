@@ -672,7 +672,7 @@ export default class CoC7ModelsItemDocumentClass extends Item {
       } else {
         change.effect.constructor.applyChange(this, change, { replacementData })
       }
-      // Named on the combat cards as the reason for the bonus or penalty die
+      // Named on the combat cards as the reason for the bonus or penalty die (diary decision 2026-11-23: weapon effects named on the combat cards)
       if (change.key === 'system.bonusDice' && this.system.bonusDice !== bonusDice) {
         this.system.addBonusDiceEffect(change.effect.name)
       }
