@@ -1,5 +1,6 @@
 import { FOLDER_ID, ERAS } from '../../constants.js'
 import CoC7ModelsItemGlobalSheet from './global-sheet.js'
+import CoC7ActiveEffect from '../../apps/active-effect.js'
 import CoC7Utilities from '../../apps/utilities.js'
 
 export default class CoC7ModelsItemWeaponSheet extends CoC7ModelsItemGlobalSheet {
@@ -29,6 +30,10 @@ export default class CoC7ModelsItemWeaponSheet extends CoC7ModelsItemGlobalSheet
       template: 'systems/' + FOLDER_ID + '/templates/items/common-tab-prices.hbs',
       scrollable: ['']
     },
+    activeEffects: {
+      template: 'systems/' + FOLDER_ID + '/templates/items/common-tab-active-effects.hbs',
+      scrollable: ['']
+    },
     keeper: {
       template: 'systems/' + FOLDER_ID + '/templates/items/common-tab-keeper.hbs',
       scrollable: ['']
@@ -56,6 +61,11 @@ export default class CoC7ModelsItemWeaponSheet extends CoC7ModelsItemGlobalSheet
         cssClass: 'icon-only-tab',
         icon: 'fa-solid fa-tag',
         tooltip: 'CoC7.ItemPrice'
+      },
+      activeEffects: {
+        cssClass: 'icon-only-tab',
+        icon: 'game-icon game-icon-aura',
+        tooltip: 'CoC7.Effects'
       }
     }
     if (game.user.isGM) {
@@ -134,6 +144,9 @@ export default class CoC7ModelsItemWeaponSheet extends CoC7ModelsItemGlobalSheet
         }
         context._eras.sort(CoC7Utilities.sortByLabelKey)
         context.useEraIcons = game.settings.get(FOLDER_ID, 'sheetEraIcons')
+        break
+      case 'activeEffects':
+        context.effects = await CoC7ActiveEffect.prepareActiveEffectCategories(context.document, { status: false })
         break
       case 'keeper':
         context.enrichedDescriptionKeeper = await foundry.applications.ux.TextEditor.implementation.enrichHTML(

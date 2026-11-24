@@ -16,11 +16,6 @@
 - **New duplication**: `coc7/apps/chat-combat-melee.js:510-527` and
   `coc7/apps/chat-combat-ranged.js:856-873`, a mainline set new since def0f082.
   Remove it with `/hh-dedupe`, or keep it with the operator's agreement.
-- **Check the worktree copy**: `.worktreeinclude` lists `/fvtt.config.json`, but
-  the worktree that added it was made before it and cannot show the copy.
-  Settled by the first session started after the merge finding
-  `fvtt.config.json` in its worktree without copying it, and
-  `npx webpack --mode development` starting there.
 
 ## Later
 

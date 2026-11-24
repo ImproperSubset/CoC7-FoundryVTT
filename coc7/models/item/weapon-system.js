@@ -3,6 +3,8 @@ import { FOLDER_ID, ERAS } from '../../constants.js'
 import CoC7ModelsItemGlobalSystem from './global-system.js'
 
 export default class CoC7ModelsItemWeaponSystem extends CoC7ModelsItemGlobalSystem {
+  #bonusDice
+
   /**
    * Default img
    * @returns {string}
@@ -244,6 +246,30 @@ export default class CoC7ModelsItemWeaponSystem extends CoC7ModelsItemGlobalSyst
       }
     }
     return false
+  }
+
+  /**
+   * @inheritdoc
+   */
+  prepareBaseData () {
+    super.prepareBaseData()
+    this.bonusDice = 0
+  }
+
+  /**
+   * To be adjusted by the weapon's own ActiveEffects
+   * @returns {int}
+   */
+  get bonusDice () {
+    return this.#bonusDice ?? 0
+  }
+
+  /**
+   * To be adjusted by the weapon's own ActiveEffects
+   * @param {int} value
+   */
+  set bonusDice (value) {
+    this.#bonusDice = value
   }
 
   /**

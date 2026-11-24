@@ -622,6 +622,60 @@ export default class CoC7ModelsItemDocumentClass extends Item {
 
   /**
    * @inheritdoc
+   */
+  prepareEmbeddedDocuments () {
+    super.prepareEmbeddedDocuments()
+    // A weapon's effects not applied to the actor change the weapon itself, such as a penalty die for its attacks; other item types are left as upstream's (diary decision 2026-11-23: a weapon's own Active Effects)
+    if (this.type === 'weapon') {
+      this.applyActiveEffects()
+    }
+  }
+
+  /**
+   * Apply the changes of this item's enabled ActiveEffects that are not applied to the actor
+   */
+  applyActiveEffects () {
+    const changes = []
+    const replacementData = this.getRollData()
+    for (const effect of this.effects) {
+      if (effect.transfer || !effect.active) {
+        continue
+      }
+      /* // FoundryVTT V13 */
+      if (game.release.generation < 14) {
+        for (const change of effect.changes) {
+          const copy = foundry.utils.deepClone(change)
+          copy.effect = effect
+          copy.priority = copy.priority ?? (copy.mode * 10)
+          changes.push(copy)
+        }
+      } else {
+        for (const change of effect.system.changes) {
+          if (!effect.shouldApplyChange(change, { phase: change.phase, replacementData })) {
+            continue
+          }
+          const copy = foundry.utils.deepClone(change)
+          copy.effect = effect
+          changes.push(copy)
+        }
+      }
+    }
+    changes.sort((a, b) => a.priority - b.priority)
+    for (const change of changes) {
+      if (!change.key) {
+        continue
+      }
+      /* // FoundryVTT V13 */
+      if (game.release.generation < 14) {
+        change.effect.apply(this, change)
+      } else {
+        change.effect.constructor.applyChange(this, change, { replacementData })
+      }
+    }
+  }
+
+  /**
+   * @inheritdoc
    * @deprecated Temporary forward
    */
   get value () {

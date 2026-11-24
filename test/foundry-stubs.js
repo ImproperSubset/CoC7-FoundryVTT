@@ -72,12 +72,22 @@ globalThis.Hooks = strict('Hooks', {
 })
 globalThis.ActiveEffect = class {}
 globalThis.Actor = class {}
-globalThis.Item = class {}
+globalThis.Item = class {
+  /**
+   * Foundry prepares the embedded effects here, the tests have none to prepare
+   */
+  prepareEmbeddedDocuments () {}
+}
 globalThis.Roll = class {}
 globalThis.TokenDocument = class {}
 globalThis.foundry = strict('foundry', {
   abstract: strict('foundry.abstract', {
-    TypeDataModel: class {}
+    TypeDataModel: class {
+      /**
+       * Foundry's own does nothing
+       */
+      prepareBaseData () {}
+    }
   }),
   applications: strict('foundry.applications', {
     api: strict('foundry.applications.api', {
@@ -134,6 +144,7 @@ globalThis.foundry = strict('foundry', {
     })
   }),
   utils: strict('foundry.utils', {
+    deepClone: value => structuredClone(value),
     duplicate: value => structuredClone(value),
     // Foundry's merges nested objects too, no test passes any
     mergeObject: (original, other) => Object.assign(original, other)

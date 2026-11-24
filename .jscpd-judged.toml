@@ -29,3 +29,27 @@ copies = [
   { file = "static/templates/chat/melee-initiator.hbs", text = "sha256:8ab6f083d9d0e8ed099111a745b3bffd1b12d0ab9dfa20a7e617e3aa3cf889d5" },
   { file = "static/templates/chat/melee-target.hbs", text = "sha256:422c75d420ba9dbbc121fffc06cf9da43d92f85d04654b7de86c2142d597e971" },
 ]
+
+[[set]]
+verdict = "kept"
+reason = "upstream's item sheet pattern for the Effects tab, which armor, status, talent and item-sheet-v2 each repeat; factoring the weapon sheet's copy away from it would conflict at every merge"
+copies = [
+  { file = "coc7/models/item/status-sheet.js", text = "sha256:abd7004511b533f3df70915f716e9f77a9e01d630b290a55c2ddc249db8a0675" },
+  { file = "coc7/models/item/weapon-sheet.js", text = "sha256:7ba0cb9bca5f70f90f82f2b0d7c96dfdfb9a3bca40ce211b7e165c17e290af6e" },
+]
+
+[[set]]
+verdict = "kept"
+reason = "upstream's item sheet pattern for the Effects tab, which armor, status, talent and item-sheet-v2 each repeat; factoring the weapon sheet's copy away from it would conflict at every merge"
+copies = [
+  { file = "coc7/models/item/armor-sheet.js", text = "sha256:818a6191042e5658394953fd238a21e58015509576bc5076965ccee9d4e011a3" },
+  { file = "coc7/models/item/weapon-sheet.js", text = "sha256:9533c506433ab0da5053b881ccd9724364c2122db7165cc88e5f64ee49371c7b" },
+]
+
+[[set]]
+verdict = "kept"
+reason = "upstream's item sheet pattern for the Effects tab, which armor, status, talent and item-sheet-v2 each repeat; factoring the weapon sheet's copy away from it would conflict at every merge"
+copies = [
+  { file = "coc7/models/item/armor-sheet.js", text = "sha256:cb8ae7864da3ca9a25ee67725db896a65e5d723ff45ed0938f3a970bddf4a87d" },
+  { file = "coc7/models/item/weapon-sheet.js", text = "sha256:8970e60b1d7eed8d22a5cfe1d687fcb5c5b8a15cdb9af64ad85190cc645b4588" },
+]
