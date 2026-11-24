@@ -954,6 +954,7 @@ export default class CoC7ChatCombatRanged {
       attackerTalent: [],
       attackerUuid: CoC7Utilities.getActorUuid(attacker),
       badConsequence: this.#badConsequence,
+      bonusDiceEffects: (item?.type === 'weapon' ? (item.system.bonusDiceEffects ?? []) : []),
       burst: this.#burst,
       canLuckAwayConsequences: game.settings.get(FOLDER_ID, 'pulpRuleLuckMalfunction'),
       damage: this.#damage,

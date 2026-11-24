@@ -5,6 +5,8 @@ import CoC7ModelsItemGlobalSystem from './global-system.js'
 export default class CoC7ModelsItemWeaponSystem extends CoC7ModelsItemGlobalSystem {
   #bonusDice
 
+  #bonusDiceEffects
+
   /**
    * Default img
    * @returns {string}
@@ -254,6 +256,7 @@ export default class CoC7ModelsItemWeaponSystem extends CoC7ModelsItemGlobalSyst
   prepareBaseData () {
     super.prepareBaseData()
     this.bonusDice = 0
+    this.#bonusDiceEffects = []
   }
 
   /**
@@ -270,6 +273,27 @@ export default class CoC7ModelsItemWeaponSystem extends CoC7ModelsItemGlobalSyst
    */
   set bonusDice (value) {
     this.#bonusDice = value
+  }
+
+  /**
+   * Names of the weapon's own ActiveEffects that changed bonusDice
+   * @returns {Array}
+   */
+  get bonusDiceEffects () {
+    return this.#bonusDiceEffects ?? []
+  }
+
+  /**
+   * Record an ActiveEffect that changed bonusDice
+   * @param {string} name
+   */
+  addBonusDiceEffect (name) {
+    if (typeof this.#bonusDiceEffects === 'undefined') {
+      this.#bonusDiceEffects = []
+    }
+    if (!this.#bonusDiceEffects.includes(name)) {
+      this.#bonusDiceEffects.push(name)
+    }
   }
 
   /**

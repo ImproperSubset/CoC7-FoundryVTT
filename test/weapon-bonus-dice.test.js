@@ -1,5 +1,5 @@
 import { documents, settings } from './foundry-stubs.js'
-import { actor, clearCreatedCard, createdCard, weapon } from './combat-cards.js'
+import { actor, clearCreatedCard, createdCard, savedMeleeMessage, savedRangedMessage, weapon } from './combat-cards.js'
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import CoC7ChatCombatMelee from '../coc7/apps/chat-combat-melee.js'
@@ -46,6 +46,7 @@ function weaponWithEffect ({ rngd, disabled = false, transfer = false }) {
   const effect = new CoC7ModelsActiveEffectDocumentClass()
   Object.assign(effect, {
     active: !disabled,
+    name: 'Bent sights',
     changes: [{ key: 'system.bonusDice', mode: 2, value: '-1' }],
     disabled,
     system: {
@@ -57,10 +58,20 @@ function weaponWithEffect ({ rngd, disabled = false, transfer = false }) {
   const system = new CoC7ModelsItemWeaponSystem()
   const data = weapon(rngd).system
   delete data.bonusDice
+  // The card's template data reads these too
+  Object.assign(data, {
+    ammo: 6,
+    description: { value: '' },
+    range: { normal: { damage: '1D10' }, long: { damage: null }, extreme: { damage: null } },
+    skillMain: undefined,
+    usesPerRound: { max: 1 }
+  })
+  data.properties.spcl = false
   // The card reads these, which the real model would find on the item's actor
   Object.defineProperties(system, Object.getOwnPropertyDescriptors(data))
   Object.assign(item, {
     effects: [effect],
+    name: 'Revolver',
     getRollData: () => system,
     system,
     type: 'weapon'
@@ -102,6 +113,35 @@ async function meleePoolModifier (options, t) {
   return createdCard().flags.CoC7.load.poolModifier
 }
 
+/**
+ * Load a saved ranged combat card for the weapon and return the effects its template data names
+ * @param {object} options weaponWithEffect options
+ * @returns {Promise<Array>}
+ */
+async function rangedEffectPills (options) {
+  documents['Actor.attacker'] = actor()
+  documents['Item.weapon'] = weaponWithEffect({ ...options, rngd: true })
+  const message = savedRangedMessage({
+    targets: [{ uuid: '', extremeRange: false, longRange: false, outOfRange: false, poolKeys: [], poolModifier: documents['Item.weapon'].system.bonusDice }]
+  })
+  const data = await (await CoC7ChatCombatRanged.loadFromMessage(message)).getTemplateData()
+  return data.bonusDiceEffects
+}
+
+/**
+ * Load a saved melee combat card for the weapon and return the pills at the bottom of its template data
+ * @param {object} options weaponWithEffect options
+ * @returns {Promise<Array>}
+ */
+async function meleeTags (options) {
+  documents['Actor.attacker'] = actor()
+  documents['Actor.target'] = actor()
+  documents['Item.weapon'] = weaponWithEffect({ ...options, rngd: false })
+  const message = savedMeleeMessage({ itemUuid: 'Item.weapon', poolModifier: documents['Item.weapon'].system.bonusDice })
+  const data = await (await CoC7ChatCombatMelee.loadFromMessage(message)).getTemplateData()
+  return data.tags
+}
+
 for (const generation of [13, 14]) {
   test('Foundry ' + generation + ': a ranged card starts with a penalty die from an enabled weapon effect', async (t) => {
     game.release.generation = generation
@@ -121,6 +161,31 @@ for (const generation of [13, 14]) {
   test('Foundry ' + generation + ': a melee card starts with no penalty die from a disabled weapon effect', async (t) => {
     game.release.generation = generation
     assert.equal(await meleePoolModifier({ disabled: true }, t), 0)
+  })
+
+  test('Foundry ' + generation + ': a ranged card names an enabled weapon effect behind its penalty die', async () => {
+    game.release.generation = generation
+    assert.deepEqual(await rangedEffectPills({}), ['Bent sights'])
+  })
+
+  test('Foundry ' + generation + ': a ranged card names no disabled weapon effect', async () => {
+    game.release.generation = generation
+    assert.deepEqual(await rangedEffectPills({ disabled: true }), [])
+  })
+
+  test('Foundry ' + generation + ': a ranged card names no weapon effect that applies to the actor', async () => {
+    game.release.generation = generation
+    assert.deepEqual(await rangedEffectPills({ transfer: true }), [])
+  })
+
+  test('Foundry ' + generation + ': a melee card names an enabled weapon effect beside its penalty die', async () => {
+    game.release.generation = generation
+    assert.deepEqual(await meleeTags({}), ['CoC7.Combat', 'Bent sights', '1 CoC7.DiceModifierPenalty'])
+  })
+
+  test('Foundry ' + generation + ': a melee card names no disabled weapon effect', async () => {
+    game.release.generation = generation
+    assert.deepEqual(await meleeTags({ disabled: true }), ['CoC7.Combat'])
   })
 
   test('Foundry ' + generation + ': an effect that applies to the actor leaves the weapon unchanged', async (t) => {

@@ -665,11 +665,16 @@ export default class CoC7ModelsItemDocumentClass extends Item {
       if (!change.key) {
         continue
       }
+      const bonusDice = this.system.bonusDice
       /* // FoundryVTT V13 */
       if (game.release.generation < 14) {
         change.effect.apply(this, change)
       } else {
         change.effect.constructor.applyChange(this, change, { replacementData })
+      }
+      // Named on the combat cards as the reason for the bonus or penalty die
+      if (change.key === 'system.bonusDice' && this.system.bonusDice !== bonusDice) {
+        this.system.addBonusDiceEffect(change.effect.name)
       }
     }
   }
