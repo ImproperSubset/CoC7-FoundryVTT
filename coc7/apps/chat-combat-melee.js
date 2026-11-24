@@ -768,6 +768,9 @@ export default class CoC7ChatCombatMelee {
         data.tags.push(data.buildTag)
       }
     }
+    if (!this.#isNoResponse && item?.type === 'weapon') {
+      data.tags = data.tags.concat(item.system.bonusDiceEffects ?? [])
+    }
     data.finalPoolModifier = Math.max(-CoC7DicePool.maxDicePenalty, Math.min(CoC7DicePool.maxDiceBonus, data.finalPoolModifier))
     if (data.finalPoolModifier < 0) {
       data.tags.push(Math.abs(data.finalPoolModifier) + ' ' + game.i18n.localize('CoC7.DiceModifierPenalty'))

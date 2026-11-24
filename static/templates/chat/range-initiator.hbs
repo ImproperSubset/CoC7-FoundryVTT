@@ -168,6 +168,9 @@
         </div>
       {{/unless}}
       <span class="tag">{{target.difficultyName}}</span>
+      {{#each ../bonusDiceEffects as |name|}}
+        <span class="tag">{{name}}</span>
+      {{/each}}
       {{#if (lt 0 target.finalPoolModifier)}}
         <span class="tag">{{localize 'CoC7.BonusDice'}}: {{target.absolutePoolModifier}}</span>
       {{else if (gt 0 target.finalPoolModifier)}}
