@@ -10,10 +10,6 @@
 - **New duplication**: `coc7/apps/chat-combat-melee.js:510-527` and
   `coc7/apps/chat-combat-ranged.js:856-873`, a mainline set new since def0f082.
   Remove it with `/hh-dedupe`, or keep it with the operator's agreement.
-- **Migrate to hh-rules v0.31.0**: start this next. Run `/hh-push-down` once and
-  bring the operator its findings on the project's `CLAUDE.md` and rules; after
-  that it is run when the operator asks. Checked by the operator having its
-  findings.
 
 ## Later
 
