@@ -24,4 +24,10 @@
   carrying a decision without its citation.
 - **Pin cspell**: CLAUDE.md has `npx cspell` run by hand before each commit,
   which fetches an unpinned version. Run it as a pinned hook among the fork's
-  own checks in prek.toml, beside eslint, and drop the by-hand step.
+  own checks in prek.toml, beside eslint, and drop the by-hand step. When it
+  drops the by-hand cspell step, also drop from CLAUDE.md's before-commit list
+  the `npm run eslint` and `npm test` steps that prek's hooks already run,
+  keeping `npx eslint --fix` on changed files and the `git diff` check. It also
+  settles which files cspell reads in the fork: the fork's own records, `diary/`
+  and `PLAN.md`, are hh-rules' and not upstream's, and `cspell.json` is
+  upstream's.
