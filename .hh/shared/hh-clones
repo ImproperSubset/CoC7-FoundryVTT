@@ -38,23 +38,24 @@ would otherwise bring each of its new ones into the plan (diary decision
 lists every pair, upstream's too.
 
 With --similar it lists pairs of functions that may do the same job without
-being copies, for Claude to read, instead of the sets. Two jscpd checks find
-them, and each finds pairs the other misses: the shape check (--similarity),
-which compares the syntax of whole functions, within a file too, at a loose
-bar; and the semantic check (--semantic), a code-embedding model that pairs
-look-alikes across files only. Without the model downloaded, the semantic
-check is skipped and the report says so. With --since as well, it lists only
-the pairs the code at REF lacks, by the same comparison.
+being copies, for Claude to read, instead of the sets. jscpd's shape check
+(--similarity) finds them, comparing the syntax of whole functions, within a
+file too, at a loose bar. jscpd's semantic check (--semantic), a
+code-embedding model, is not run (diary decision 2026-11-27: the semantic
+check removed). With --since as well, it lists only the pairs the code at REF
+lacks, by the same comparison.
 
 A pair already judged is skipped: .jscpd-judged.toml, at the project root,
 records each verdict with the scores the pair had then. A function is named by
 its file, its first line, and which occurrence of that line in the file it is,
 since jscpd reports no function names and line numbers move with every edit.
-Both checks give the same score on unchanged code, so a recorded pair is listed
-again only when a check's score has risen more than MARGIN above the recorded
-one, or a check that did not find it then finds it now; a rise is listed with
---since too, since jscpd does not call such a pair new. Each pair listed comes
-with a block for the record, its verdict and reason left blank to fill in.
+The shape check gives the same score on unchanged code, so a recorded pair is
+listed again only when its shape score has risen more than MARGIN above the
+recorded one; a rise is listed with --since too, since jscpd does not call
+such a pair new. A record holding no shape score, such as one judged under the
+semantic check alone, keeps its pair skipped, since its verdict was on the
+same two functions. Each pair listed comes with a block for the record, its
+verdict and reason left blank to fill in.
 
 A set kept with the operator's agreement is skipped too: the record holds it
 as a [[set]] entry naming each copy by its file and a digest of its text, so
@@ -93,10 +94,8 @@ CASES = ("mainline", "test", "test-and-mainline", "prose")
 # reaches functions that do one job written differently (diary decision
 # 2026-11-13: similar functions only on request).
 SHAPE_ARGS = ("--similarity", "0.4", "--kind", "similar")
-SEMANTIC_ARGS = ("--semantic", "--kind", "semantic")
-# jscpd's message when the semantic check's model is not downloaded.
-MODEL_MISSING = "is not downloaded yet"
-CHECK_NAMES = {"similar": "shape", "semantic": "semantic"}
+# The shape check's name in the record's scores.
+SHAPE = "shape"
 # The record of judged similar pairs, at the project root.
 RECORD = Path(".jscpd-judged.toml")
 # What the reader decided: different jobs, both kept, or left to a named task.
@@ -158,7 +157,11 @@ class FunctionKey:
 
 @dataclass(frozen=True)
 class Judged:
-    """A recorded verdict on a pair, with the scores the pair had then."""
+    """A recorded verdict on a pair, with the scores the pair had then.
+
+    The scores are kept as recorded, any check's, though only the shape
+    check's is compared.
+    """
 
     verdict: str
     reason: str
@@ -167,20 +170,16 @@ class Judged:
 
 @dataclass(frozen=True)
 class Similar:
-    """Two functions one or both checks pair, with each check's score."""
+    """Two functions the shape check pairs, with its score."""
 
     first: Place
     second: Place
-    scores: tuple[tuple[str, float], ...]
+    score: float
     case: str
     format: str
     new: bool = False
     # Why a judged pair is listed again; empty for a pair not judged.
     again: str = ""
-
-    def found_by_both(self) -> bool:
-        """Say whether both checks paired these functions."""
-        return len(self.scores) > 1
 
 
 @dataclass(frozen=True)
@@ -329,43 +328,20 @@ def group(clones: Sequence[Clone], test_globs: Sequence[str]) -> list[CloneSet]:
     return sets
 
 
-def overlaps(a: Place, b: Place) -> bool:
-    """Say whether two places share a line in one file."""
-    return a.file == b.file and a.start <= b.end and b.start <= a.end
-
-
-def same_pair(a: Clone, b: Clone) -> bool:
-    """Say whether two pairs join the same two functions, either way round."""
-    return (overlaps(a.first, b.first) and overlaps(a.second, b.second)) or (
-        overlaps(a.first, b.second) and overlaps(a.second, b.first)
-    )
-
-
 def similar_pairs(clones: Sequence[Clone], test_globs: Sequence[str]) -> list[Similar]:
-    """Join the checks' pairs, those found by both first, then by best score."""
-    groups: list[list[Clone]] = []
-    for c in clones:
-        match = next((g for g in groups if same_pair(g[0], c)), None)
-        if match is None:
-            groups.append([c])
-        else:
-            match.append(c)
-    pairs: list[Similar] = []
-    for g in groups:
-        scores = {CHECK_NAMES.get(c.kind, c.kind): c.similarity for c in g}
-        sides = (g[0].first, g[0].second)
-        pairs.append(
-            Similar(
-                *sides,
-                tuple(sorted(scores.items(), key=lambda s: -s[1])),
-                case_of(sides, [g[0].format], test_globs),
-                g[0].format,
-                any(c.new for c in g),
-            ),
+    """Return the shape check's pairs, highest score first."""
+    pairs = [
+        Similar(
+            c.first,
+            c.second,
+            c.similarity,
+            case_of((c.first, c.second), [c.format], test_globs),
+            c.format,
+            c.new,
         )
-    pairs.sort(
-        key=lambda p: (not p.found_by_both(), -p.scores[0][1], p.first, p.second)
-    )
+        for c in clones
+    ]
+    pairs.sort(key=lambda p: (-p.score, p.first, p.second))
     return pairs
 
 
@@ -540,15 +516,12 @@ def set_block(s: CloneSet, root: Path) -> list[str]:
 
 def listed_again(p: Similar, judged: Judged) -> str:
     """Say why a judged pair is listed again, or "" when it stays skipped."""
-    then = dict(judged.scores)
-    for check, score in p.scores:
-        if check not in then:
-            return f"judged {judged.verdict}; now found by the {check} check too"
-        if score > then[check] + MARGIN:
-            return (
-                f"judged {judged.verdict}; {check} score rose from "
-                f"{then[check]:.3f} to {score:.3f}"
-            )
+    then = dict(judged.scores).get(SHAPE)
+    if then is not None and p.score > then + MARGIN:
+        return (
+            f"judged {judged.verdict}; {SHAPE} score rose from "
+            f"{then:.3f} to {p.score:.3f}"
+        )
     return ""
 
 
@@ -581,12 +554,11 @@ def record_block(p: Similar, root: Path) -> list[str]:
     first, second = key_of(p.first, root), key_of(p.second, root)
     if first is None or second is None:
         return ["  (no record entry: a file could not be read)"]
-    scores = ", ".join(f"{name} = {score}" for name, score in sorted(p.scores))
     out = [
         "  [[pair]]",
         '  verdict = ""',
         '  reason = ""',
-        f"  scores = {{ {scores} }}",
+        f"  scores = {{ {SHAPE} = {p.score} }}",
     ]
     for side, k in (("first", first), ("second", second)):
         out.append(
@@ -598,7 +570,6 @@ def record_block(p: Similar, root: Path) -> list[str]:
 
 def render_similar(
     pairs: Sequence[Similar],
-    skipped: str | None,
     since: str | None = None,
     *,
     judged: int = 0,
@@ -607,40 +578,19 @@ def render_similar(
     """Return the pairs as lines: a summary, then each pair with its block."""
     counts = {case: sum(p.case == case for p in pairs) for case in CASES[:3]}
     summary = ", ".join(f"{case} {n}" for case, n in counts.items())
-    both = sum(p.found_by_both() for p in pairs)
     what = "similar pairs" if since is None else f"new similar pairs since {since}"
-    out = [f"{len(pairs)} {what}, {both} found by both checks: {summary}"]
+    out = [f"{len(pairs)} {what}: {summary}"]
     if judged:
         out.append(f"{judged} judged pairs skipped, as recorded in {RECORD}")
-    if skipped is not None:
-        out.append(f"semantic check not run: {skipped}")
     for p in pairs:
-        scores = ", ".join(f"{name} {score:.2f}" for name, score in p.scores)
-        out.extend(["", f"{scores}, {p.case}, {p.format}", f"  {p.first}"])
+        head = f"{SHAPE} {p.score:.2f}, {p.case}, {p.format}"
+        out.extend(["", head, f"  {p.first}"])
         out.append(f"  {p.second}")
         if p.again:
             out.append(f"  listed again: {p.again}")
         if root is not None:
             out.extend(record_block(p, root))
     return out
-
-
-def run_similar(
-    jscpd_args: Sequence[str], since: str | None = None
-) -> tuple[list[Clone], str | None]:
-    """Run both checks; return their pairs and why the semantic one was skipped."""
-    clones = read_report(run_jscpd([*SHAPE_ARGS, *jscpd_args], since))
-    try:
-        clones += read_report(run_jscpd([*SEMANTIC_ARGS, *jscpd_args], since))
-    except CannotRunError as e:
-        if MODEL_MISSING not in str(e):
-            raise
-        return clones, (
-            "its model is not downloaded; run "
-            "`prek exec jscpd -- jscpd --semantic-download` once, outside the "
-            "sandbox"
-        )
-    return clones, None
 
 
 def render(
@@ -745,7 +695,7 @@ def main(argv: Sequence[str]) -> int:
     jscpd_args = cast("list[str]", args.jscpd)
     if args.similar:
         try:
-            clones, skipped = run_similar(jscpd_args, since)
+            clones = read_report(run_jscpd([*SHAPE_ARGS, *jscpd_args], since))
         except CannotRunError as e:
             print(f"hh-clones: {e}", file=sys.stderr)
             return EXIT_CANNOT_RUN
@@ -763,7 +713,7 @@ def main(argv: Sequence[str]) -> int:
         pairs, judged = apply_record(pairs, record, root)
         if since is not None:
             pairs = [p for p in pairs if p.new or p.again]
-        lines = render_similar(pairs, skipped, since, judged=judged, root=root)
+        lines = render_similar(pairs, since, judged=judged, root=root)
         print("\n".join(lines))
         return EXIT_REPORTED
     try:

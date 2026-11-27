@@ -67,17 +67,18 @@ paths:
   commit's hash, and writes `Commits: the commit that adds this entry` (diary
   decision 2026-11-11: a decision's own commit).
 
-  `Replaces` appears whenever the decision overrides an earlier one, whatever
-  its topic, with one line for each decision it overrides (diary decision
-  2026-11-01: decision chains in the diary). A decision that overrides only part
-  of an earlier one, such as an exception to it, restates what still stands of
-  the earlier one along with the change, and replaces it, so every decision in
-  force reads whole and a doc line cites only that one (diary decision
-  2026-11-02: partial overrides in the diary). A decision that moves a set of
-  files states the move once, naming the old place and listing the decisions in
-  force that name it; those decisions stay in force, read with the new place,
-  and are not restated (diary decision 2026-11-14: a move of files stated once).
-  A topic contains no parentheses, because docs cite a decision as
+  `Replaces` appears whenever the decision overrides an earlier one whole,
+  whatever its topic, with one line for each decision it overrides (diary
+  decision 2026-11-01: decision chains in the diary). A decision that changes
+  only part of an earlier one, such as an exception to it, states only the
+  change, with a `- Changes: <diary file>, <topic>` line in place of `Replaces`;
+  the earlier one stays in force for the rest and keeps its citations, and a doc
+  line on the changed part cites the new one (diary decision 2026-11-24: partial
+  overrides state only the change). A decision that moves a set of files states
+  the move once, naming the old place and listing the decisions in force that
+  name it; those decisions stay in force, read with the new place, and are not
+  restated (diary decision 2026-11-14: a move of files stated once). A topic
+  contains no parentheses, because docs cite a decision as
   `(diary decision YYYY-MM-DD: <topic>)`. A topic is renamed by a new decision
   entry that restates the decision under the new topic, with a `Replaces` line
   naming the old one (diary decision 2026-11-01: renaming a decision topic). The
@@ -119,13 +120,18 @@ paths:
   - Replaces: <diary file>, <topic>
   ```
 
-  `<topic>` in the heading is the decision being corrected. Where several
-  decisions share the topic, a correction speaks for the latest written before
-  it that no earlier correction withdrew, so after a restatement is withdrawn, a
-  further correction reaches the decision its withdrawal restored (diary
-  decision 2026-11-13: a correction after a withdrawal reaches what it
-  restored). Anything that follows the chain of decisions reads these entries
-  too.
+  `<topic>` in the heading is the decision being corrected. No heading repeats
+  within a file, which markdownlint's MD024 refuses, so a further correction to
+  the same topic on the same day is headed
+  `## YYYY-MM-DD: Further correction to <topic>`, and is read as a correction
+  like the first. MD024 stays on for the diary, since it catches real repeats,
+  such as an entry pasted twice (diary decision 2026-11-27: a further same-day
+  correction given its own heading). Where several decisions share the topic, a
+  correction speaks for the latest written before it that no earlier correction
+  withdrew, so after a restatement is withdrawn, a later correction reaches the
+  decision its withdrawal restored (diary decision 2026-11-13: a correction
+  after a withdrawal reaches what it restored). Anything that follows the chain
+  of decisions reads these entries too.
 
 - A decision that should not have been recorded, such as one on work not yet
   done, is withdrawn by a correction carrying a `- Withdrawn: <reason>` line. It
@@ -136,13 +142,13 @@ paths:
   own `Replaces` lines. One that a new choice overrides is replaced instead
   (diary decision 2026-11-13: withdrawing a decision that replaced others).
 
-- A decision in force that is only partly built is replaced, as a partial
-  override is, by a new entry recorded after the fact that restates only what is
-  built, so every decision in force is true of the project. Each unbuilt choice
-  it held goes into its plan task as a provisional decision, with the operator's
-  words and the reasons and rejections that bear on it, since the plan is then
-  the only place it survives (diary decision 2026-11-13: a partly built decision
-  restated to its built part).
+- A decision in force that is only partly built is replaced by a new entry
+  recorded after the fact that restates only what is built, so every decision in
+  force is true of the project. Each unbuilt choice it held goes into its plan
+  task as a provisional decision, with the operator's words and the reasons and
+  rejections that bear on it, since the plan is then the only place it survives
+  (diary decision 2026-11-13: a partly built decision restated to its built
+  part).
 
 - An entry written by `/hh-wrap` carries the `Metrics:` paragraph that
   `hh-metrics` prints, word for word, so the next wrap can compare against it,

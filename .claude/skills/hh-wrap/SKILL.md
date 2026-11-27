@@ -3,8 +3,9 @@ name: hh-wrap
 description: >-
   Before a session ends, flush the session's progress and decisions to the
   project diary, strip history, dates and counts from the docs changed this
-  session, fix the diary where procedure was not followed, and put what needs
-  settling in the plan.
+  session, fix the diary where procedure was not followed, and settle what needs
+  a choice with hh-advise where it answers for the operator, or put it in the
+  plan.
 disable-model-invocation: true
 ---
 # Wrap up the session
@@ -16,23 +17,32 @@ Works in the current project, which keeps a diary in `diary/` (format in the
 
 - The current diary file is today's, `diary/<today's date>.md`, created if it
   does not exist (format in the `diary` rule).
+
 - A session working on a branch of its own, as a background session does in its
   worktree, takes as the base the commit where its branch last met the project's
   working branch: `git merge-base HEAD origin/<working branch>`, after a
   `git fetch origin`. The last `Wrapped at` line in the diary is not its base:
-  where sessions' entries were joined by a union merge, that line can be another
-  session's, in either order (diary decision 2026-11-20: a branch's wrap starts
-  where it left the working branch).
-- Any other session's base commit is the most recent `Wrapped at <commit>` line:
-  `command grep -h "^Wrapped at " diary/*.md | tail -1` (the shell sorts the
-  date-named files, and GNU grep keeps that order; `grep -r` and the Bash tool's
-  own `grep` function do not). With none, use the parent of the first commit
-  made in this session, judged from the conversation. When that commit is the
-  repository's first, the base is the whole history:
-  `git hash-object -t tree /dev/null` gives the empty tree to diff against. With
-  no commit in this session, use `HEAD`.
+  where sessions' entries were joined by a merge, that line can be another
+  session's (diary decision 2026-11-24: v0.31.0's code for cases no client meets
+  cut).
+
+- Any other session, on the project's checkout, takes as the base the commit of
+  the last wrap made on the checkout's branch itself:
+  `git log --first-parent --no-merges -G '^Wrapped at ' -1 --format=%h -- diary/`,
+  which names the last commit of the branch's own that added a `Wrapped at` line
+  to the diary. The last `Wrapped at` line in the diary is not its base: where
+  sessions' pull requests are merged into the branch, that line can be a
+  session's from its own branch, which `--first-parent` and `--no-merges` leave
+  out, and the checkout's own changes since its last wrap fall before it (diary
+  decision 2026-11-24: v0.31.0's code for cases no client meets cut). With none,
+  use the parent of the first commit made in this session, judged from the
+  conversation. When that commit is the repository's first, the base is the
+  whole history: `git hash-object -t tree /dev/null` gives the empty tree to
+  diff against. With no commit in this session, use `HEAD`.
+
 - Note the current commit: `git rev-parse --short HEAD`. This is where the wrap
   starts.
+
 - This session's changes are `git diff <base>` (committed and uncommitted) plus
   any new untracked files outside the sandbox placeholder paths.
 
@@ -47,9 +57,9 @@ Works in the current project, which keeps a diary in `diary/` (format in the
   which go in the plan in sections 4 and 5.
 - Append one `CC_DIARY_DECISION` entry per decision about work done or a rule
   now in force, with the options considered and why each rejected one was
-  rejected. A decision that reverses all or part of one still in force restates
-  what still stands and carries `Replaces`, as the `diary` rule says; a note
-  beside the old decision is not enough.
+  rejected. A decision that reverses one still in force carries `Replaces`, or
+  `Changes` where it changes only part, as the `diary` rule says; a note beside
+  the old decision is not enough.
 - An agreed design for work not yet done gets no entry: it belongs in its plan
   task, each choice in it a provisional decision, `- CC_PLAN_DECISION: <topic>`
   nested under the task in the form the principles give. One the task does not
@@ -64,7 +74,9 @@ Works in the current project, which keeps a diary in `diary/` (format in the
   `rulesync.lock` lists as `resolvedRuleNames` and under `skills`, and comments
   in changed code), find history: dates, counts that will go stale,
   "previously", "used to", "was changed", and accounts of how something came to
-  be.
+  be. A figure in a reference file on outside work, pinned to the version it was
+  read at, is not history and stays (diary decision 2026-11-24: dated figures
+  kept in a reference file on outside work).
 - Rewrite each so it states what is. Move any history worth keeping into the
   diary entry. A reason that prevents a future edit stays.
 - In the same lines, find what is not yet true: a TODO or an intended behaviour
@@ -76,14 +88,18 @@ Works in the current project, which keeps a diary in `diary/` (format in the
 
 A finding is fixed here only when procedure was not followed and the answer is
 already settled, by a decision in force or by the operator's words in this
-conversation; anything that needs a choice is for the operator.
+conversation; anything that needs a choice is for the operator, or, where the
+hh-advise session answers for the operator, for hh-advise, as the end of this
+section says.
 
 - Run the mechanical checks: `.hh/shared/hh-drift` in a project, or
   `bin/hh-drift` in hh-rules itself, and again with `--carried`, which lists the
   decisions in force that nothing cites and no `CC_NO_DOC` line marks. Each
-  prints one finding per line and exits 1 when there are any. If the script is
-  missing, say so in the report. In a project, the rules and skills hh-rules
-  provides cite hh-rules' diary, and are not read against the project's.
+  prints one finding per line and exits 1 when there are any, and 2 when it
+  cannot run, which goes in the report as a check not made, never read as clean.
+  If the script is missing, say so in the report. In a project, the rules and
+  skills hh-rules provides cite hh-rules' diary, and are not read against the
+  project's.
 
 - For each diary decision this session added (in `git diff <base> -- diary/`),
   check that the line citing it says what was decided and any reason a later
@@ -138,17 +154,18 @@ conversation; anything that needs a choice is for the operator.
   unchanged. Leave out too an `exclude` equal to the same hook's in hh-rules'
   own file at the project's pinned tag, the tag in `rulesync.jsonc`:
   `git -C ~/git/hh-rules show <tag>:prek/base.toml`, or `prek/format.toml`,
-  `prek/fork.toml` or `prek/<pack>.toml` for a hook of theirs. Report each one
-  left with no `(diary decision …)` beside it as a finding (diary decision
-  2026-11-09: the wrap lists uncited exceptions).
+  `prek/fork.toml` or `prek/<pack>.toml` for a hook of theirs. In a git
+  worktree, as a background session's, write the `~` out as the home directory's
+  full path and the tag out in full, with no shell variable, since Claude Code
+  there refuses a git command aimed at a folder it must work out, or one in a
+  Bash call holding a shell variable, as `/hh-rules` says of its own commands on
+  hh-rules. Report each one left with no `(diary decision …)` beside it as a
+  finding (diary decision 2026-11-09: the wrap lists uncited exceptions).
 
 - Fix these, with any diary entry in today's file:
 
   - a missing `Replaces` line, where the conversation shows the override was
     meant: a `Correction to <topic>` entry;
-  - a partial override that does not restate what still stands, where that is
-    clear: a decision entry restating it, with a `Replaces` line for each
-    decision it overrides;
   - a citation of a replaced decision: moved to the decision that replaced it,
     the only change to the doc line;
   - a decision whose intent a doc line already states without citing it: the
@@ -174,17 +191,39 @@ conversation; anything that needs a choice is for the operator.
 
 - After fixing, run the mechanical checks again.
 
-- Put every finding in the session summary entry, each with where it is and
-  whether it was fixed; with none, the entry says the check found nothing. The
-  change proposed for a finding goes in its plan line alone.
+- Where the hh-advise session answers for the operator, each finding left for
+  the operator is decided by hh-advise instead, and is not put in the plan for
+  the operator: in a wrap run through `/hh-wrap-supervised`, of a client
+  hh-advise supervises, and in hh-advise's own wrap while it supervises. Once
+  section 6 has run, a client's wrap sends hh-advise every finding left from
+  this section, every loose end from section 5, and every test set aside and new
+  duplication set section 6 raises, in one message, each with where it is and
+  the change proposed, and waits for its answers; hh-advise's own wrap decides
+  its own as `/hh-supervise` has it decide anything else. For each, the wrap
+  then does what the answer says before it commits: makes the fix, writes the
+  plan task the answer calls for, as the answer words it, or leaves it as it is
+  where the answer is to keep it, such as a test set aside or a copy hh-advise
+  agrees to keep, recorded where the rule on it says. Only a finding whose
+  answer stays the operator's under `/hh-supervise`, such as a change to a
+  project's rules packs, goes into the plan as below. Once the answers are done,
+  run the mechanical checks again, since a fix they call for can change docs and
+  the diary after the run above (diary decision 2026-11-23: the wrap resolves
+  its findings where hh-advise can answer).
 
-- Each finding left for the operator goes into the plan, with no agreement
-  asked: one that belongs to a task already there is added to that task, and any
-  other is a line of its own at the top of the plan's list of work, above every
-  other item. The line says what was found, where, and the change proposed, so
-  it can be settled without the diary. An earlier wrap's lines stay. The commit
-  that settles a finding removes its line (diary decision 2026-11-22: wrap fixes
-  procedure and plans the rest, a client's findings on other tasks reported).
+- Put every finding in the session summary entry, each with where it is and
+  whether it was fixed, or, where hh-advise answered it, what it decided and
+  what the wrap did; with none, the entry says the check found nothing. The
+  change proposed for a finding left in the plan goes in its plan line alone.
+
+- Each finding left for the operator, and not decided by hh-advise as above,
+  goes into the plan, with no agreement asked: one that belongs to a task
+  already there is added to that task, and any other is a line of its own at the
+  top of the plan's list of work, above every other item. The line says what was
+  found, where, and the change proposed, so it can be settled without the diary.
+  An earlier wrap's lines stay, above an update's migration item too. The commit
+  that settles a finding removes its line (diary decision 2026-11-23: the wrap
+  resolves its findings where hh-advise can answer) (diary decision 2026-11-23:
+  moving a project to a newer tag, its item below the wrap's lines).
 
   ```markdown
   - **Wrap finding**: <what was found and where>. Proposed: <the change>.
@@ -194,10 +233,10 @@ conversation; anything that needs a choice is for the operator.
   through `/hh-connect`, adds its own `Wrap finding` and `Loose end` lines as
   this skill asks, and changes no other session's task, since another session
   may be changing it: a finding that belongs to another task goes in its report
-  to the advisor, not into that task, and the summary entry says so. A session
-  on the project's checkout adds it to the task as above (diary decision
-  2026-11-22: wrap fixes procedure and plans the rest, a client's findings on
-  other tasks reported).
+  to the advisor, not into that task, and the summary entry says so, as does an
+  answer of hh-advise's that changes another task. A session on the project's
+  checkout adds it to the task as above (diary decision 2026-11-23: the wrap
+  resolves its findings where hh-advise can answer).
 
 ## 5. Put the session's loose ends in the plan
 
@@ -209,13 +248,20 @@ conversation; anything that needs a choice is for the operator.
     operator that has none;
   - a finding from the operator, an advisor or a watcher that is not settled;
   - anything put off to a later commit, such as what the commit that builds a
-    task must also write.
+    task must also write;
+  - a general lesson learned in the session that belongs in a rules pack's skill
+    and has not been sent. Sent to hh-advise, it is a draft, with where it comes
+    from and what was checked and how, as `/hh-connect` says of any change to
+    what hh-rules shares (diary decision 2026-11-25: the wrap asks for a lesson
+    not yet sent).
 
-- Each goes into the plan, with no agreement asked: one that belongs to a task
-  already there is added to that task, saying what is to be done; any other is a
-  line of its own beside the `Wrap finding` lines. A client's loose end that
-  belongs to another task goes in its report to the advisor instead, as section
-  4 says of a finding. The commit that settles it removes it.
+- Where hh-advise answers for the operator, each goes to it with section 4's
+  findings and is done as it answers, as section 4 says. Each other goes into
+  the plan, with no agreement asked: one that belongs to a task already there is
+  added to that task, saying what is to be done; any other is a line of its own
+  beside the `Wrap finding` lines. A client's loose end that belongs to another
+  task goes in its report to the advisor instead, as section 4 says of a
+  finding. The commit that settles it removes it.
 
   ```markdown
   - **Loose end**: <what is undone, who it is owed to or waits on, and what
@@ -228,31 +274,63 @@ conversation; anything that needs a choice is for the operator.
 
 - Run `.hh/shared/hh-metrics` in a project, or `bin/hh-metrics` in hh-rules
   itself. For each metric it prints a `Metrics:` line and a `Change:` line, and
-  it lists what is excluded from duplication. If the script is missing, or it
-  fails, say so in the report and record no figures.
+  it lists what is excluded from duplication, and prints a `Not measured:` line
+  for each test hook left out of the commit checks, which it passes over. If the
+  script is missing, or it fails, say so in the report and record no figures.
 
 - Add each `Metrics:` line to the session summary entry as a paragraph of its
   own, exactly as printed. The next run finds it there to report the change.
 
 - Put the `Change:` lines first in the report, ahead of everything else, each
-  with its `Metrics:` line beside it, and the exclusions after them.
+  with its `Metrics:` line beside it, and the exclusions and `Not measured:`
+  lines after them (diary decision 2026-11-26: a test hook left out passed over
+  by hh-metrics).
 
 - Find the tests set aside in the whole project, not only those this session
   touched. Each rules pack the project installs whose test runner is among the
   project's commit checks gives its `Metrics:` line the runner's count of them,
   which its rule names, with what the runner counts and does not, and the
-  command that lists each such test. Where a count is above 0, run that command,
-  and list each test it gives, with its file, in the session summary entry,
-  under `Tests set aside:`, so the next wrap can compare. Each test on the list
-  that the last such list in the diary does not hold is a finding, left for the
-  operator as section 4 says and put in the plan the same way, unless a line
-  there already holds it; a test the last list holds was raised before, and is
-  listed again but not raised, so a test the operator agreed to keep is raised
-  once. A test set aside is never changed here: whether it is fixed, deleted or
-  kept as it is, is the operator's to decide. Where such a pack's line is
-  missing, or `hh-metrics` failed, the report says the tests set aside were not
-  counted (diary decision 2026-11-22: tests set aside counted by the test
-  runner, each raised once).
+  command that lists each such test. That count takes in every hook of the
+  runner's prek group as well as the pack's own, so the rule also gives the
+  command that lists the tests set aside in each hook `prek list --group` names
+  in the root project, its full id opening `.:`, as `hh-metrics` counts them,
+  and each of those commands is run too, its lines listed with the pack hook's
+  (diary decision 2026-11-24: v0.31.0's code for cases no client meets cut).
+  Read each such pack's rule by its path, `.claude/rules/<pack>.md`, for those
+  commands, since it loads only once a file it covers is read (diary decision
+  2026-11-24: the push-down's moves on hh-rules, those that leave the start and
+  those turned down). Wherever the tests set aside were counted, the session
+  summary entry carries a `Tests set aside:` line, so the next wrap can compare:
+  where a count is above 0, run every such command, and list under it each line
+  they give for a test set aside, as the status or mark and the name it prints,
+  a subtest's name included, and nothing else: no reason, duration, line number
+  or progress figure, so a test keeps its entry when its line moves or its
+  reason is reworded. The list is a fenced code block marked `text`, one entry
+  to a line, which the commit's Markdown formatter and linter leave as written,
+  so the next wrap reads back the text the command printed, a name's underscores
+  and a `<subtest>` included. A line given several times, as by several subtests
+  with no name in one test, is listed as often as it is given. A command that
+  fails lists nothing for its hook, and the report says so, with its error.
+  Where every count is 0, the line is `Tests set aside: none`, so a test set
+  aside again after a wrap with none is raised again. The list to compare with
+  is the last such line in the diary as it stood at section 1's base, so the
+  base and the list come from the same history, and an entry joined in from
+  another branch is not taken for the last: the last line
+  `git grep -n '^Tests set aside:' <base> -- diary/` prints gives its file and
+  line, and the tests listed under it are read there with
+  `git show <base>:<file>`. Each entry on this wrap's list that it does not
+  hold, or holds fewer times, is a finding, left for the operator as section 4
+  says and put in the plan the same way, or decided by hh-advise where it
+  answers, unless a line in the plan already holds it; an entry the last list
+  holds as often was raised before, and is listed again but not raised, so a
+  test the operator agreed to keep is raised once. A test set aside is never
+  changed here unless hh-advise's answer says so: whether it is fixed, deleted
+  or kept as it is, is the operator's to decide, or hh-advise's where it
+  answers. Where such a pack's line is missing, or `hh-metrics` failed, the
+  report says the tests set aside were not counted, and the entry has no
+  `Tests set aside:` line (diary decision 2026-11-24: tests set aside counted by
+  the test runner, each listed by name) (diary decision 2026-11-23: the wrap
+  resolves its findings where hh-advise can answer).
 
 - List the duplication new since step 1's base: `.hh/shared/hh-clones` in a
   project, or `bin/hh-clones` in hh-rules itself, with `--since <base>` and the
@@ -260,14 +338,19 @@ conversation; anything that needs a choice is for the operator.
   tree, leave out `--since`: every set is new. Exit 2 means it could not run:
   say so in the report and add nothing to the plan.
 
-- For each set it lists, add a line at the top of the plan's list of work, below
+- Where hh-advise answers for the operator, each set it lists goes to it with
+  section 4's findings, and the wrap does as it answers, as section 4 says: a
+  plan task to remove the copies, or the copies kept in `.jscpd-judged.toml`
+  with hh-advise's agreement standing for the operator's (diary decision
+  2026-11-23: new duplication in the plan, or decided by hh-advise). Otherwise,
+  for each set it lists, add a line at the top of the plan's list of work, below
   any `Wrap finding` and `Loose end` lines and above every other item, with no
   agreement asked, since the commit check never fails on a copy and a new one
   otherwise goes unseen. An earlier wrap's lines stay. The commit that removes
   the copies, or that records the operator's agreement to keep them in
-  `.jscpd-judged.toml`, removes the line (diary decision 2026-11-13: new
-  duplication in the plan) (diary decision 2026-11-13: kept copy sets recorded
-  by their text).
+  `.jscpd-judged.toml`, removes the line (diary decision 2026-11-23: new
+  duplication in the plan, or decided by hh-advise) (diary decision 2026-11-13:
+  kept copy sets recorded by their text).
 
   ```markdown
   - **New duplication**: <each place, file:start-end>, a <case> set new since
@@ -305,17 +388,28 @@ conversation; anything that needs a choice is for the operator.
   `bin/hh-push-check` in hh-rules itself, and act on its first line, which is
   one of three:
 
-  - `push:`, with exit 0: the repository `origin` names is private. Run the
-    `git push origin <branch>` it prints, with no read.
+  - `push:`, with exit 0: the repository `origin` names is private or internal.
+    Run the `git push --no-follow-tags origin <branch>` it prints, with no read.
   - `read first:`, with exit 3: the repository is public, or its visibility
     could not be read. Read everything the push would make public, as the
-    principles say, with the two commands it prints, each in a call of its own:
-    `git fetch --prune origin`, so the remote's branches are known as they now
-    are, a deleted one no longer among them, and
-    `git log -p --cc <branch> --not --remotes=origin`, which gives the commits
-    no branch of the remote holds, a merge's own changes among them. Run the
-    push it prints only where both commands exit 0 and the read shows no secret
-    and no infrastructure detail; otherwise do not push.
+    principles say, with the three commands it prints, each in a call of its
+    own: `git fetch --prune origin`, so the remote's branches are known as they
+    now are, a deleted one no longer among them;
+    `git log -p --cc <branch> --not --remotes=origin --output=<file>`, which
+    writes to a file the script made the commits no branch of the remote holds,
+    a merge's own changes among them; and `wc -l <file>`, which gives its number
+    of lines. Then read the file with the Read tool, in parts with `offset` and
+    `limit` where it is long, until the line `wc` counts has been read, since
+    the Bash tool gives a long output only as a short preview, the rest in a
+    file it names, and the preview can be taken for the read. Run the push it
+    prints only where the three commands exit 0, every line of the file was
+    read, and the read shows no secret and no infrastructure detail; otherwise
+    do not push. A Read that refuses or fails is a read not done. Once the read
+    is done, pushed or not, run the `rm -f <file>` it prints last, by the
+    literal path, since the file holds every change the push would publish, a
+    secret the read found among them (diary decision 2026-11-23: the wrap's push
+    check sends the branch alone and reads from a file) (diary decision
+    2026-11-23: the wrap's push read removed once done).
   - `no push:`, with exit 2: the project has no remote named `origin`, the wrap
     is on no branch, or one of the script's other refusals, which the line
     names. Push nothing.
@@ -329,14 +423,15 @@ conversation; anything that needs a choice is for the operator.
 - Report: the metrics from step 6 and the tests set aside it found, or that it
   could not count them, then entries written, docs cleaned, the commit hash,
   step 4's findings, each with where it is and whether it was fixed or added to
-  the plan, step 5's loose ends, each with where it went in the plan, and step
-  7's tasks that may be moot and tasks to settle, each with its question; or,
-  for each, that it found none; and what was pushed, or why nothing was, with
-  what the read found where it stopped the push.
+  the plan, or, where hh-advise answered it, what it decided and what the wrap
+  did, step 5's loose ends, each with where it went in the plan or what
+  hh-advise decided and what was done, and step 7's tasks that may be moot and
+  tasks to settle, each with its question; or, for each, that it found none; and
+  what was pushed, or why nothing was, with what the read found where it stopped
+  the push.
 
-- If work since the last release cannot be tried until a release, end the report
-  by saying so and asking once whether to make one. The question is the
-  operator's even while supervising, since supervising does not extend to a
-  release. The wrap makes no release, and an unanswered question is not raised
-  again before the next wrap (diary decision 2026-11-19: releases at the
-  operator's go-ahead, asked once at the wrap).
+- The wrap makes no release and does not ask about one, of the operator or of
+  hh-advise, since a release is made only when the operator asks for one. The
+  report may say that work can't be tried until a release, and lists no release
+  as something waiting or asked for (diary decision 2026-11-24: releases made
+  only when the operator asks, none asked about or awaited).

@@ -55,19 +55,20 @@ the end of two functions that do different things, is left and reported.
   jscpd skills and their `npx skills add` lines do not apply: `/hh-rules` pins
   the two skills a project uses. An extracted function goes in a module its
   callers already import from, where there is one, before a new utility file.
-- **test**: use the test framework's own tools, which the rules pack names:
-  repeated setup becomes a fixture or setup hook named for what it sets up;
-  tests whose bodies match and whose data differs become one parametrized test
-  with a table of cases; repeated construction of test data becomes a builder
-  that takes only the fields a test cares about. Each test still reads on its
-  own: the inputs that make a case different, and what it checks, stay visible
-  in it. Once a fixture or builder exists, use it wherever the same shape
-  appears in the files the fix touches, not only in the set's copies, since
-  jscpd misses copies that line wrapping or a small difference sets apart. The
-  shape is the whole of the set's real copy: a place that repeats only part of
-  it is left. Where the new helper generalises an earlier one, rebuild the
-  earlier one on it, so the copied code is written once. Repetition in tests is
-  never skipped as boilerplate.
+- **test**: use the test framework's own tools, which the rules pack's rule
+  names; read it by its path, `.claude/rules/<pack>.md`, since it loads only
+  once a file it covers is read: repeated setup becomes a fixture or setup hook
+  named for what it sets up; tests whose bodies match and whose data differs
+  become one parametrized test with a table of cases; repeated construction of
+  test data becomes a builder that takes only the fields a test cares about.
+  Each test still reads on its own: the inputs that make a case different, and
+  what it checks, stay visible in it. Once a fixture or builder exists, use it
+  wherever the same shape appears in the files the fix touches, not only in the
+  set's copies, since jscpd misses copies that line wrapping or a small
+  difference sets apart. The shape is the whole of the set's real copy: a place
+  that repeats only part of it is left. Where the new helper generalises an
+  earlier one, rebuild the earlier one on it, so the copied code is written
+  once. Repetition in tests is never skipped as boilerplate.
 - **test-and-mainline**: a test copies the project's own code, usually to work
   out its expected value the way the code does, so it cannot catch a bug in that
   logic. Change the test to state the expected value as a literal, or to check a
@@ -79,7 +80,9 @@ the end of two functions that do different things, is left and reported.
 
 A set left unfixed, by `dry-refactoring`'s triage or for any other reason, is
 reported with its reason. One the operator agrees to keep, or leaves to a plan
-task, is recorded: copy the block the listing printed under the set into
+task, is recorded, the hh-advise session's agreement standing for the operator's
+while it supervises (diary decision 2026-11-23: new duplication in the plan, or
+decided by hh-advise): copy the block the listing printed under the set into
 `.jscpd-judged.toml` at the project root, with its `verdict`, `kept` or `task`,
 and a one-line `reason`, and commit it. `hh-clones` then skips the set while its
 copies' text is unchanged, however their lines move, and lists it again once any
@@ -107,21 +110,15 @@ wrap, since its pairs need reading and nearly all prove different jobs (diary
 decision 2026-11-13: similar functions only on request).
 
 - Run `.hh/shared/hh-clones --similar` with the same `--test` globs as step 1.
-  It lists pairs, each with the checks that found it and their scores: the shape
-  check, which compares the syntax of whole functions, within one file too, at a
-  loose bar; and the semantic check, a code-embedding model that pairs
-  look-alikes across files only. Pairs both checks find come first. Pairs
-  already judged are skipped, as recorded in `.jscpd-judged.toml`, and the
-  summary counts them; one listed again says why, a score risen or a check newly
-  finding it.
-- A summary line saying the semantic check was not run means its model is not on
-  this machine. Tell the operator, and give the two steps that install it once
-  per machine: add `~/.cache/jscpd`, as an absolute path, to the sandbox's write
-  list in the user settings, beside `~/.cache/prek`; and type
-  `! prek exec jscpd -- jscpd --semantic-download` in a session, which runs it
-  outside the sandbox, since jscpd rejects the sandbox proxy's certificate.
-  Report the run as the shape check alone. Exit 2 means a check could not run;
-  stop and report it, as in step 1.
+  It lists pairs with their scores from jscpd's shape check, which compares the
+  syntax of whole functions, within one file too, at a loose bar, highest score
+  first. jscpd's semantic check, a code-embedding model, is not used: nearly
+  every pair it gave proved two different jobs, it took minutes on a large
+  project and needed a large model on each machine (diary decision 2026-11-27:
+  the semantic check removed). Pairs already judged are skipped, as recorded in
+  `.jscpd-judged.toml`, and the summary counts them; one listed again says why,
+  its score risen. Exit 2 means the check could not run; stop and report it, as
+  in step 1.
 - Read both functions of every pair, in full, with their callers. Most pairs at
   these bars are related code, not duplicates: a function and its inverse, two
   parsers of different layouts. Keep a pair only when both do the same job, and
@@ -135,7 +132,8 @@ decision 2026-11-13: similar functions only on request).
   the block the listing printed under the pair into `.jscpd-judged.toml` at the
   project root, creating it if needed, with its `verdict` and a one-line
   `reason`. The verdict is `different` for different jobs, `kept` for both kept
-  with the operator's agreement, or `task` for one left to a plan task, which
-  the reason names. A pair listed again replaces its old entry. A merged pair
-  needs no entry, since it is gone. Commit the record with the work it records
-  (diary decision 2026-11-06: a record of judged similar pairs).
+  with the operator's agreement, or hh-advise's while it supervises, or `task`
+  for one left to a plan task, which the reason names. A pair listed again
+  replaces its old entry. A merged pair needs no entry, since it is gone. Commit
+  the record with the work it records (diary decision 2026-11-06: a record of
+  judged similar pairs).

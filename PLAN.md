@@ -1,11 +1,5 @@
 # Plan
 
-- **Migrate to hh-rules v0.30.0**: start this next. In `prek.toml`, replace the
-  comment above the jscpd hook, from the line
-  `# Duplication: jscpd over the whole tracked tree` down to the `[[repos]]`
-  line above that hook, with the block quoted in full under "The jscpd comment"
-  in `~/git/hh-rules/migrations/v0.30.0.md`. Checked by the comment matching
-  that block word for word, and `prek run --all-files` passing.
 - **New duplication**: `test/combat-cards.js:129-142`,
   `test/maneuver.test.js:69-81` and
   `test/melee-response-dropdown.test.js:42-54`, a test set new since def0f082.
@@ -16,6 +10,10 @@
 - **New duplication**: `coc7/apps/chat-combat-melee.js:510-527` and
   `coc7/apps/chat-combat-ranged.js:856-873`, a mainline set new since def0f082.
   Remove it with `/hh-dedupe`, or keep it with the operator's agreement.
+- **Migrate to hh-rules v0.31.0**: start this next. Run `/hh-push-down` once and
+  bring the operator its findings on the project's `CLAUDE.md` and rules; after
+  that it is run when the operator asks. Checked by the operator having its
+  findings.
 
 ## Later
 
