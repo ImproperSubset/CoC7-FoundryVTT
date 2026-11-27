@@ -24,14 +24,16 @@ still in force has parentheses, and that each `CC_NO_DOC` line sits in a
 decision or a correction and gives a reason. Then run it again with `--carried`,
 which lists each decision in force that nothing cites and no `CC_NO_DOC` line
 marks. Each prints one finding per line, then a count, and exits 1 when there
-are findings. If it is missing, say so and carry on with section 2.
+are findings and 2 when it cannot run, such as with no `diary/`; a run that
+exits 2 is reported as a check not made, never read as clean. If it is missing,
+say so and carry on with section 2.
 
 ## 2. The decisions in force
 
 - List the decisions, oldest first:
   `command grep -n "^## .*CC_DIARY_DECISION" diary/*.md`. A decision is in force
-  unless a later decision's `Replaces` line, or a `Correction to <topic>`
-  entry's, names it.
+  unless a later decision's `Replaces` line, or a `Correction to <topic>` or
+  `Further correction to <topic>` entry's, names it.
 - Treat the `Replaces` links as evidence, not fact. Read the decisions in force
   by subject, and report any two on the same subject where the later one changes
   the earlier with no `Replaces` line: a silent override.

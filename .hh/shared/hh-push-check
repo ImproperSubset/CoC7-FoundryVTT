@@ -16,8 +16,9 @@
 #   no push: ...     exit 2  the project has no remote named origin, HEAD is
 #                            on no branch, the branch's name holds a character
 #                            a shell would act on, origin pushes to another
-#                            address than it fetches from, or origin has more
-#                            than one address
+#                            address than it fetches from, origin has more
+#                            than one address, git could not list them, or no
+#                            file with a plain name could be made for the read
 #
 # Only a visibility read as PRIVATE or INTERNAL allows a push with no read: a
 # gh that fails gives no answer, and no answer is not a private repository.
@@ -28,7 +29,13 @@
 # The branch's name goes into the commands printed, so one a shell would act on
 # is refused. A name and password written into the address are left out of what
 # is printed and of what gh is given (diary decision 2026-11-21: a push made by
-# the wrap).
+# the wrap). The push printed sends the branch alone, with --no-follow-tags,
+# since a user's push.followTags would send tags too, and the read is written
+# to a file, made under TMPDIR, whose name the commands carry (diary decision
+# 2026-11-23: the wrap's push check sends the branch alone and reads from a
+# file). The file is removed on a refusal after it is made, and the commands
+# end with its removal (diary decision 2026-11-23: the wrap's push read removed
+# once done).
 set -uo pipefail
 
 if ! branch="$(git symbolic-ref --quiet --short HEAD)"; then
@@ -49,8 +56,11 @@ if ! fetched="$(git remote get-url origin 2>/dev/null)" ||
     exit 2
 fi
 # A push goes to every address origin has, and gh is asked about one.
-if ! all="$(git remote get-url --all --push origin 2>/dev/null)" ||
-    [[ "${all}" != "${url}" ]]; then
+if ! all="$(git remote get-url --all --push origin 2>/dev/null)"; then
+    echo "no push: git could not list origin's push addresses"
+    exit 2
+fi
+if [[ "${all}" != "${url}" ]]; then
     echo "no push: origin has more than one address"
     exit 2
 fi
@@ -68,7 +78,7 @@ if visibility="$("${ask[@]}" 2>/dev/null)"; then
         word=private
         [[ "${visibility}" == PRIVATE ]] || word=internal
         echo "push: ${url} is ${word}, so the push needs no read"
-        echo "  git push origin ${branch}"
+        echo "  git push --no-follow-tags origin ${branch}"
         exit 0
         ;;
     PUBLIC)
@@ -84,8 +94,25 @@ else
     why="gh could not read the visibility of ${url}: ${message:-no message}"
 fi
 
+# The read goes to a file, read in parts, because the Bash tool gives a long
+# output only as a short preview, the rest in a file it names, so a session can
+# take the preview for the read. The file holds every change the
+# push would publish, a secret the read finds among them, so it is removed on a
+# refusal here, and the commands end with its removal.
+if ! read_file="$(mktemp "${TMPDIR:-/tmp}/hh-push-read.XXXXXX" 2>/dev/null)"; then
+    echo "no push: no file could be made for the read"
+    exit 2
+fi
+if [[ ! "${read_file}" =~ ^[A-Za-z0-9._/-]+$ ]]; then
+    rm -f -- "${read_file:?}"
+    echo "no push: the file for the read has a name a shell would act on"
+    exit 2
+fi
+
 echo "read first: ${why}"
 echo "  git fetch --prune origin"
-echo "  git log -p --cc ${branch} --not --remotes=origin"
-echo "  git push origin ${branch}"
+echo "  git log -p --cc ${branch} --not --remotes=origin --output=${read_file}"
+echo "  wc -l ${read_file}"
+echo "  git push --no-follow-tags origin ${branch}"
+echo "  rm -f ${read_file}"
 exit 3

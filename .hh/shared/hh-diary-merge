@@ -1,0 +1,211 @@
+#!/usr/bin/env python3
+"""Join two branches' diary files: the branch merged in first, then ours.
+
+The diary is append-only, so when two sessions have each added entries since
+their branches met, the right result is one side's file whole and the other
+side's added lines after it. git's union merge does not give that: it matches
+lines both sides added, such as a summary's `Metrics:` lines, as common, keeps
+them once and joins the rest around them (diary decision 2026-11-25: the diary
+joined by its own merge driver, not the union merge).
+
+As git's merge driver, named by `diary/*.md merge=hh-diary` in
+`.gitattributes` and defined in each clone's config by
+
+    git config merge.hh-diary.driver '.hh/shared/hh-diary-merge %O %A %B %P'
+
+which bin/hh-background and bin/hh-advise run at every launch (diary decision
+2026-11-25: the diary driver's config set by the launch scripts), it reads
+the common ancestor's file (%O), the current branch's (%A) and the merged
+branch's (%B). Where the ancestor's text begins both sides, it writes
+%B whole and then the lines %A added, with one blank line between, into %A,
+and exits 0. The branch merged in comes first because a session brings its
+own branch up to date by merging the working branch into it, so the working
+branch's copy stays whole and the session's own entries follow; a merge made
+the other way round would put the merged-in branch's entries first too. A
+file new on both sides joins the same way, the `# Diary` lines before the
+first entry, where both sides open with them, kept once. Any other change,
+such as an earlier entry edited on one side, goes to git's ordinary 3-way
+merge of the same files; where that leaves conflicts, they are marked in %A
+and the script exits 1, so git reports the conflict and nothing is lost
+unseen. A clone whose config lacks the driver gets git's plain text merge,
+which reports the two sides' appends as a conflict.
+
+    hh-diary-merge --rejoin
+
+joins the diary files of a merge already made, by another driver such as the
+union merge or by hand: in a merge stopped on conflicts, between HEAD and
+MERGE_HEAD; otherwise between the parents of HEAD, which must be a merge. For
+each `diary/*.md` file the current side changed since the two met, it writes
+the same join into the working tree and prints `rejoined: <file>`, or `same:
+<file>` where the file already holds it, or `conflict: <file>` where the join
+does not apply, writing nothing to that file. It exits 0 when no file printed
+`conflict:`, 1 otherwise, and 2 on wrong usage or where there is no merge to
+rejoin. The caller stages and commits what it wrote.
+"""
+
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+
+USAGE = 2
+CONFLICT = 1
+REJOIN = "--rejoin"
+
+
+def git_program() -> str:
+    """Give git's path; fail where it is not on PATH."""
+    git = shutil.which("git")
+    if git is None:
+        msg = "git is not on PATH"
+        raise RuntimeError(msg)
+    return git
+
+
+def preamble(text: str) -> str:
+    """Give the lines of the text before its first `## ` heading."""
+    lines = text.splitlines(keepends=True)
+    head: list[str] = []
+    for line in lines:
+        if line.startswith("## "):
+            break
+        head.append(line)
+    return "".join(head)
+
+
+def join(base: str, ours: str, theirs: str) -> str | None:
+    """Give theirs whole and then the lines ours added, or None.
+
+    None means the two sides did more than add lines after the base's last.
+    """
+    shared = base
+    if not base:
+        shared = preamble(ours)
+        if not theirs.startswith(shared):
+            shared = ""
+    elif not base.endswith("\n"):
+        return None
+    if not (ours.startswith(shared) and theirs.startswith(shared)):
+        return None
+    added = ours[len(shared) :]
+    if not added.strip():
+        return theirs
+    if not theirs[len(shared) :].strip():
+        return ours
+    return theirs.rstrip("\n") + "\n\n" + added.lstrip("\n")
+
+
+def drive(base_file: str, ours_file: str, theirs_file: str, name: str) -> int:
+    """Merge as git's driver, the result in ours_file; give the exit status."""
+    base, ours, theirs = (
+        Path(file).read_text(encoding="utf-8")
+        for file in (base_file, ours_file, theirs_file)
+    )
+    joined = join(base, ours, theirs)
+    if joined is not None:
+        Path(ours_file).write_text(joined, encoding="utf-8")
+        return 0
+    merged = subprocess.run(
+        [
+            git_program(),
+            "merge-file",
+            *("-L", "ours", "-L", "base", "-L", "theirs"),
+            *(ours_file, base_file, theirs_file),
+        ],
+        check=False,
+    )
+    if merged.returncode == 0:
+        return 0
+    print(
+        f"hh-diary-merge: {name}: an earlier entry differs between the sides;"
+        " conflict left for a merge by hand",
+        file=sys.stderr,
+    )
+    return CONFLICT
+
+
+def git_out(*args: str) -> str | None:
+    """Give a git command's output, or None where it fails."""
+    done = subprocess.run(
+        [git_program(), *args], capture_output=True, text=True, check=False
+    )
+    return done.stdout if done.returncode == 0 else None
+
+
+def blob(ref: str, name: str) -> str:
+    """Give the file at the commit, or an empty text where it lacks it."""
+    return git_out("show", f"{ref}:{name}") or ""
+
+
+def sides() -> tuple[str, str] | None:
+    """Give our commit and the merged one, or None where there is no merge."""
+    if git_out("rev-parse", "-q", "--verify", "MERGE_HEAD") is not None:
+        return "HEAD", "MERGE_HEAD"
+    if git_out("rev-parse", "-q", "--verify", "HEAD^2") is not None:
+        return "HEAD^1", "HEAD^2"
+    return None
+
+
+def rejoin() -> int:
+    """Join the diary files of a merge already made; give the exit status."""
+    found = sides()
+    if found is None:
+        print("hh-diary-merge: no merge to rejoin", file=sys.stderr)
+        return USAGE
+    ours_ref, theirs_ref = found
+    base_out = git_out("merge-base", ours_ref, theirs_ref)
+    top = git_out("rev-parse", "--show-toplevel")
+    if base_out is None or top is None:
+        print("hh-diary-merge: the two sides have no merge base", file=sys.stderr)
+        return USAGE
+    base_ref = base_out.strip()
+    names = (
+        git_out(
+            "diff",
+            "--name-only",
+            "--diff-filter=AM",
+            base_ref,
+            ours_ref,
+            "--",
+            "diary/*.md",
+        )
+        or ""
+    )
+    rc = 0
+    for name in names.splitlines():
+        joined = join(
+            blob(base_ref, name), blob(ours_ref, name), blob(theirs_ref, name)
+        )
+        file = Path(top.strip()) / name
+        if joined is None:
+            print(f"conflict: {name}")
+            rc = CONFLICT
+        elif file.exists() and file.read_text(encoding="utf-8") == joined:
+            print(f"same: {name}")
+        else:
+            file.write_text(joined, encoding="utf-8")
+            print(f"rejoined: {name}")
+    return rc
+
+
+def main(argv: list[str]) -> int:
+    """Run as the merge driver or, with --rejoin, on a merge already made."""
+    match argv:
+        case [option] if option == REJOIN:
+            return rejoin()
+        case [base, ours, theirs]:
+            return drive(base, ours, theirs, ours)
+        case [base, ours, theirs, name]:
+            return drive(base, ours, theirs, name)
+        case _:
+            pass
+    print(
+        "usage: hh-diary-merge <base> <ours> <theirs> [<path>]\n"
+        "       hh-diary-merge --rejoin",
+        file=sys.stderr,
+    )
+    return USAGE
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

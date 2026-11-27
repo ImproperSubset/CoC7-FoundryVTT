@@ -17,6 +17,11 @@
 # therefore skip them; gitleaks and reuse, which check the project's own
 # secrets and labels, do not.
 
+# The oldest prek these checks and .hh/shared/hh-metrics run on: hh-metrics
+# asks `prek list --group` in every project. An older prek refuses this file
+# and names the version it needs.
+minimum_prek_version = "0.4.5"
+
 [[repos]]
 repo = "https://github.com/gitleaks/gitleaks"
 rev = "v8.30.1"
@@ -51,14 +56,16 @@ entry = ".hh/shared/hh-drift --carried"
 always_run = true
 pass_filenames = false
 
-# Duplication: jscpd over the whole tracked tree at every commit, all
-# languages, printing its figures and marking as new each clone that HEAD does
-# not have. It never fails a commit, because metrics are reported as numbers
-# and never held to a threshold; the wrap puts each new clone in the plan. Its
-# exclusions are in .jscpd.jsonc, each with its reason, and
-# .hh/shared/jscpd-run strips that file's comments for jscpd, which reads only
-# strict JSON; it is pinned here and installed by prek from PyPI. By default
-# jscpd skips what .gitignore lists and does not follow symlinks.
+# Duplication: jscpd over the working tree, less what .gitignore lists, at
+# every commit, all languages, printing its figures and marking as new each
+# clone that HEAD does not have. It never fails a commit, because metrics are
+# reported as numbers and never held to a threshold; the wrap puts each new
+# clone in the plan. Its exclusions are in .jscpd.jsonc, each with its reason,
+# and .hh/shared/jscpd-run strips that file's comments for jscpd, which reads
+# only strict JSON; it is pinned here and installed by prek from PyPI. jscpd
+# reads untracked files too, so a folder that is not the project's, such as
+# Claude Code's worktrees, is kept out by a .gitignore line; it does not follow
+# symlinks.
 [[repos]]
 repo = "local"
 

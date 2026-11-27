@@ -33,7 +33,8 @@ of its `CLAUDE.md` (diary decision 2026-11-01: glossaries).
   a project's use of hh-rules).
 - **plan**: the project's ordered list of tasks the operator wants done, next
   first, `PLAN.md` at the project root. Claude says what it will add before
-  adding it.
+  adding it, except the lines `/hh-wrap` adds (diary decision 2026-11-24: the
+  wrap's lines in the plan's glossary entry).
 - **diary**: Claude's dated record in `diary/` of what happened in each session,
   what was decided and why. It is Claude's record; the operator does not need to
   read it.

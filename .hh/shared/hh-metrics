@@ -2,11 +2,12 @@
 # Prints each of the project's metrics as a diary paragraph, and its change
 # since the last such paragraph in the diary: duplication always, and test
 # coverage and the tests set aside where the project has a pytest or vitest
-# hook. In a fork, a project with an `upstream` remote, it adds the fork's own
-# copies and the coverage of the lines it changed, both counted from where its
-# branch last met upstream. /hh-wrap puts the paragraphs in its session summary
-# and the changes in its report. Metrics are reported, never judged: this
-# script fails only when it cannot measure.
+# hook, or a hook in the `pytest` or `vitest` group. In a fork, a project with
+# an `upstream` remote, it adds the fork's own copies and the coverage of the
+# lines it changed, both counted from where its branch last met upstream.
+# /hh-wrap puts the paragraphs in its session summary and the changes in its
+# report. Metrics are reported, never judged: this script fails only when it
+# cannot measure.
 #
 # The paragraph is matched with its whitespace collapsed, because mdformat may
 # wrap it across lines.
@@ -58,75 +59,182 @@ plain() {
     sed -E $'s/\x1b\\[[0-9;]*[A-Za-z]//g'
 }
 
-# Coverage through the project's pytest hook, when it has one (the Python
-# pack). The TOTAL row of pytest-cov's report gives statements, missed and the
-# percentage.
+# The tests set aside are counted in every hook of a runner's group, so a
+# project's second test hook, such as one with a config of its own, is counted
+# with the pack's. A project puts each such hook in the group, `pytest` or
+# `vitest`, with prek's `groups` field, and the pack's own hook is read whether
+# it is in the group or not. Coverage is read from the pack's hook alone: the
+# diary's figures are of it, and a figure from another hook covers a different
+# set of tests, which no text summary can be added to. Only the root project's
+# hooks are read, as `.:` selects them. Each hook runs under `-v`, which prints
+# the output of a hook that passes without `verbose = true` (diary decision
+# 2026-11-24: v0.31.0's code for cases no client meets cut).
+#
+# `prek list --group` needs prek 0.4.5 or later, and is asked in every project;
+# on an earlier prek the script fails with prek's own error.
+#
+# A hook left out of the commit checks, kept in `prek.toml` marked
+# `stages = ["manual"]` until its findings are fixed, is passed over, and named
+# in a `Not measured:` line: its figures would be those of tests that do not
+# pass, and prek would still run it here, since it falls back to the manual
+# stage for a hook named on its command line. The stages are read from prek's
+# own listing, not from `prek.toml`, so a hook that sets none, or one under a
+# `default_stages` that holds `pre-commit`, is measured (diary decision
+# 2026-11-26: a test hook left out passed over by hh-metrics).
+left_out=()
+
+# Prints, for each hook of the group, `run <selector>` where prek runs it at
+# commit, and `left <selector>` where it does not.
+hooks_of() {
+    local grouped all err errf rc
+    errf="$(mktemp "${TMPDIR:-/tmp}/hh-metrics-err.XXXXXX")" || exit 1
+    grouped="$(prek list --group "$1" --output-format json 2>"${errf}")"
+    rc=$?
+    err="$(<"${errf}")"
+    if ((rc != 0)); then
+        command rm -f -- "${errf:?}"
+        printf 'hh-metrics: prek list --group %s failed; it needs prek 0.4.5 or later:\n%s\n' \
+            "$1" "${err}" >&2
+        exit 1
+    fi
+    all="$(prek list --output-format json 2>"${errf}")"
+    rc=$?
+    err="$(<"${errf}")"
+    command rm -f -- "${errf:?}"
+    if ((rc != 0)); then
+        printf 'hh-metrics: prek list failed:\n%s\n' "${err}" >&2
+        exit 1
+    fi
+    jq -r --arg runner "$1" --argjson grouped "${grouped}" '
+        ([".:" + $runner] + [$grouped[].full_id]) as $wanted
+        | map(select(.full_id | IN($wanted[]) and startswith(".:")))
+        | unique_by(.full_id) | .[]
+        | if (.stages | type) != "array" then error("no stages listed for " + .full_id)
+          elif any(.stages[]; . == "pre-commit") then "run " + .full_id
+          else "left " + .full_id end' \
+        <<<"${all}" || {
+        printf 'hh-metrics: could not read the hooks of the %s group\n' "$1" >&2
+        exit 1
+    }
+}
+
+# Runs each hook of a runner's group that the project has and hands its output
+# to the runner's reader, `read_<runner>`, with the hook's selector; a hook that
+# prints nothing the reader can read fails the script there. A hook of the group
+# that prek skips because no file matches its `files`, for which prek prints a
+# line of its own, not indented as a hook's output is, ending
+# `(no files to check)Skipped`, ran no tests and adds nothing; the pack's own
+# hook skipped fails the script, since its coverage figure would be missing
+# (diary decision 2026-11-24: v0.31.0's code for cases no client meets cut).
+# Sets `ran` where any hook ran. The pytest hooks alone get the option below, so a
+# hook of the `vitest` group runs as its commit check does. pytest 9 counts a
+# skipped or xfailed subtest in its summary line as skipped or xfailed only
+# where its subtest verbosity is not 0. That verbosity defaults to pytest's
+# own, which is 0 in the commit check's run, so it is raised here. On an
+# earlier pytest the pytest-subtests plugin counts a skipped one as skipped and
+# an xfailed one as `subtests xfailed`, and ignores the option (diary decision
+# 2026-11-22: subtests counted as tests set aside, under pytest 9 and the
+# plugin).
+run_group() {
+    local hooks hook out addopts="${PYTEST_ADDOPTS:-}"
+    hooks="$(hooks_of "$1")" || exit 1
+    if [[ "$1" == pytest ]]; then
+        addopts="${addopts} -o verbosity_subtests=1"
+    fi
+    ran=""
+    while IFS= read -r hook; do
+        [[ -n "${hook}" ]] || continue
+        if [[ "${hook}" == "left "* ]]; then
+            left_out+=("${hook#left }")
+            continue
+        fi
+        hook="${hook#run }"
+        out="$(PYTEST_ADDOPTS="${addopts}" \
+            prek run -v "${hook}" --all-files 2>&1 | plain)"
+        if grep -qE '^[^[:space:]].*\(no files to check\)Skipped[[:space:]]*$' <<<"${out}"; then
+            if [[ "${hook}" == ".:$1" ]]; then
+                printf 'hh-metrics: prek skipped the pack'\''s hook %s, which no file matched, so there is no coverage figure:\n%s\n' \
+                    "${hook}" "${out}" >&2
+                exit 1
+            fi
+            continue
+        fi
+        ran=1
+        "read_$1" "${hook}" "${out}"
+    done <<<"${hooks}"
+}
+
+# The Python pack's figures. The TOTAL row of pytest-cov's report gives
+# statements, missed and the percentage. The tests pytest set aside come from
+# its summary line: those it skipped, and those a mark expected to fail, whether
+# they failed or passed. /hh-wrap raises each with the operator (diary decision
+# 2026-11-24: tests set aside counted by the test runner, each listed by name).
 cov_now=""
 skip_now=""
 skip_pattern='Metrics: pytest set aside [0-9]+ skipped, [0-9]+ xfailed, [0-9]+ xpassed\.'
 cov_pattern='Metrics: coverage [0-9]+% of [0-9]+ statements, [0-9]+ missed\.'
-# pytest 9 counts a skipped or xfailed subtest in its summary line as skipped or
-# xfailed only where its subtest verbosity is not 0. That verbosity defaults to
-# pytest's own, which is 0 in the commit check's run, so it is raised here. On
-# an earlier pytest the pytest-subtests plugin counts a skipped one as skipped
-# and an xfailed one as `subtests xfailed`, and ignores the option (diary
-# decision 2026-11-22: subtests counted as tests set aside, under pytest 9 and
-# the plugin).
-out="$(PYTEST_ADDOPTS="${PYTEST_ADDOPTS:-} -o verbosity_subtests=1" \
-    prek run .:pytest --all-files 2>&1 | plain)"
-if ! grep -q 'did not match any hooks' <<<"${out}"; then
-    rows="$(grep -E '^[[:space:]]*TOTAL[[:space:]]' <<<"${out}")"
-    read -r _ statements missed percent _ <<<"${rows##*$'\n'}"
-    if [[ ! "${statements:-}" =~ ^[0-9]+$ || ! "${missed:-}" =~ ^[0-9]+$ || ! "${percent:-}" =~ ^[0-9]+%$ ]]; then
-        printf 'hh-metrics: no coverage total in the output of prek run .:pytest:\n%s\n' "${out}" >&2
-        exit 1
+skipped=0
+xfailed=0
+xpassed=0
+read_pytest() {
+    local hook="$1" out="$2" rows statements missed percent summary
+    if [[ "${hook}" == .:pytest ]]; then
+        rows="$(grep -E '^[[:space:]]*TOTAL[[:space:]]' <<<"${out}")"
+        read -r _ statements missed percent _ <<<"${rows##*$'\n'}"
+        if [[ ! "${statements:-}" =~ ^[0-9]+$ || ! "${missed:-}" =~ ^[0-9]+$ || ! "${percent:-}" =~ ^[0-9]+%$ ]]; then
+            printf 'hh-metrics: no coverage total in the output of prek run %s:\n%s\n' "${hook}" "${out}" >&2
+            exit 1
+        fi
+        cov_now="Metrics: coverage ${percent} of ${statements} statements, ${missed} missed."
     fi
-    cov_now="Metrics: coverage ${percent} of ${statements} statements, ${missed} missed."
-    # The tests pytest set aside, from its summary line: those it skipped, and
-    # those a mark expected to fail, whether they failed or passed. /hh-wrap
-    # raises each with the operator (diary decision 2026-11-22: tests set aside
-    # counted by the test runner, each raised once).
     summary="$(grep -E '^[[:space:]]*(=+ )?(no tests ran|[0-9]+ [a-z]+( [a-z]+)*(, [0-9]+ [a-z]+( [a-z]+)*)*) in [0-9.]+s' <<<"${out}")"
     if [[ -z "${summary}" ]]; then
-        printf 'hh-metrics: no summary line in the output of prek run .:pytest:\n%s\n' "${out}" >&2
+        printf 'hh-metrics: no summary line in the output of prek run %s:\n%s\n' "${hook}" "${out}" >&2
         exit 1
     fi
     summary="${summary##*$'\n'}"
-    skipped="$(count "${summary}" skipped)"
-    xfailed="$(count "${summary}" xfailed)"
-    xfailed=$((xfailed + $(count "${summary}" 'subtests xfailed')))
-    xpassed="$(count "${summary}" xpassed)"
+    skipped=$((skipped + $(count "${summary}" skipped)))
+    xfailed=$((xfailed + $(count "${summary}" xfailed) + $(count "${summary}" 'subtests xfailed')))
+    xpassed=$((xpassed + $(count "${summary}" xpassed)))
+}
+run_group pytest
+if [[ -n "${ran}" ]]; then
     skip_now="Metrics: pytest set aside ${skipped} skipped, ${xfailed} xfailed, ${xpassed} xpassed."
 fi
 
-# Coverage through the project's vitest hook, when it has one (the TypeScript
-# pack). The Statements row of Vitest's text-summary report gives the
-# percentage, the statements covered and the total.
+# The TypeScript pack's figures. The Statements row of Vitest's text-summary
+# report gives the percentage, the statements covered and the total. The tests
+# Vitest set aside come from its Tests row: those it skipped, which include those
+# a `.only` left out, and those written as todo.
 vcov_now=""
 vskip_now=""
 vskip_pattern='Metrics: Vitest set aside [0-9]+ skipped, [0-9]+ todo\.'
 vcov_pattern='Metrics: Vitest coverage [0-9.]+% of [0-9]+ statements, [0-9]+ missed\.'
-out="$(prek run .:vitest --all-files 2>&1 | plain)"
-if ! grep -q 'did not match any hooks' <<<"${out}"; then
-    row="$(grep -E '^[[:space:]]*Statements[[:space:]]*:' <<<"${out}")"
-    if [[ ! "${row##*$'\n'}" =~ :[[:space:]]*([0-9.]+%)[[:space:]]*\([[:space:]]*([0-9]+)/([0-9]+)[[:space:]]*\) ]]; then
-        printf 'hh-metrics: no coverage total in the output of prek run .:vitest:\n%s\n' "${out}" >&2
-        exit 1
+vskipped=0
+vtodo=0
+read_vitest() {
+    local hook="$1" out="$2" row covered total
+    if [[ "${hook}" == .:vitest ]]; then
+        row="$(grep -E '^[[:space:]]*Statements[[:space:]]*:' <<<"${out}")"
+        if [[ ! "${row##*$'\n'}" =~ :[[:space:]]*([0-9.]+%)[[:space:]]*\([[:space:]]*([0-9]+)/([0-9]+)[[:space:]]*\) ]]; then
+            printf 'hh-metrics: no coverage total in the output of prek run %s:\n%s\n' "${hook}" "${out}" >&2
+            exit 1
+        fi
+        covered="${BASH_REMATCH[2]}"
+        total="${BASH_REMATCH[3]}"
+        vcov_now="Metrics: Vitest coverage ${BASH_REMATCH[1]} of ${total} statements, $((total - covered)) missed."
     fi
-    vpercent="${BASH_REMATCH[1]}"
-    vcovered="${BASH_REMATCH[2]}"
-    vtotal="${BASH_REMATCH[3]}"
-    vcov_now="Metrics: Vitest coverage ${vpercent} of ${vtotal} statements, $((vtotal - vcovered)) missed."
-    # The tests Vitest set aside, from its Tests row: those it skipped, which
-    # include those a `.only` left out, and those written as todo.
     row="$(grep -E '^[[:space:]]*Tests[[:space:]]+[0-9]+ [a-z]+.*\([0-9]+\)[[:space:]]*$' <<<"${out}")"
     if [[ -z "${row}" ]]; then
-        printf 'hh-metrics: no Tests row in the output of prek run .:vitest:\n%s\n' "${out}" >&2
+        printf 'hh-metrics: no Tests row in the output of prek run %s:\n%s\n' "${hook}" "${out}" >&2
         exit 1
     fi
     row="${row##*$'\n'}"
-    vskipped="$(count "${row}" skipped)"
-    vtodo="$(count "${row}" todo)"
+    vskipped=$((vskipped + $(count "${row}" skipped)))
+    vtodo=$((vtodo + $(count "${row}" todo)))
+}
+run_group vitest
+if [[ -n "${ran}" ]]; then
     vskip_now="Metrics: Vitest set aside ${vskipped} skipped, ${vtodo} todo."
 fi
 
@@ -209,10 +317,14 @@ excluded="$("${here}/jscpd-run" --exclusions)" || exit 1
 echo "Excluded from duplication: ${excluded:-none}"
 if [[ -n "${cov_now}" ]]; then
     report "${cov_now}" "${cov_pattern}"
+fi
+if [[ -n "${skip_now}" ]]; then
     report "${skip_now}" "${skip_pattern}"
 fi
 if [[ -n "${vcov_now}" ]]; then
     report "${vcov_now}" "${vcov_pattern}"
+fi
+if [[ -n "${vskip_now}" ]]; then
     report "${vskip_now}" "${vskip_pattern}"
 fi
 if [[ -n "${fork_dup_now}" ]]; then
@@ -221,3 +333,6 @@ fi
 if [[ -n "${fork_cov_now}" ]]; then
     report "${fork_cov_now}" "${fork_cov_pattern}"
 fi
+for hook in "${left_out[@]}"; do
+    echo "Not measured: ${hook}, left out of the commit checks."
+done

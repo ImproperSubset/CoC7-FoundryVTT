@@ -47,7 +47,9 @@ from pathlib import Path
 from typing import cast
 
 DECISION = re.compile(r"^## (\d{4}-\d{2}-\d{2}): CC_DIARY_DECISION: (.+?)\s*$")
-CORRECTION = re.compile(r"^## (\d{4}-\d{2}-\d{2}): Correction to (.+?)\s*$")
+CORRECTION = re.compile(
+    r"^## (\d{4}-\d{2}-\d{2}): (?:Correction|Further correction) to (.+?)\s*$",
+)
 HEADING = re.compile(r"^## ")
 REPLACES = re.compile(r"^\s*- Replaces: (.+?)\s*$")
 NO_DOC = re.compile(r"^\s*- CC_NO_DOC:(.*)$")

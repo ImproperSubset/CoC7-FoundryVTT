@@ -2,35 +2,42 @@
   "lockfileVersion": 1,
   "sources": {
     "impropersubset/hh-rules": {
-      "requestedRef": "v0.30.0",
-      "resolvedRef": "1f7542e51639eb729a9ccb4346bb968bb5d5601b",
-      "resolvedAt": "2026-11-23T00:57:03.290Z",
+      "requestedRef": "v0.31.0",
+      "resolvedRef": "b75fc85a0da35cadfb4fd1c8653e2ee5b66633d9",
+      "resolvedAt": "2026-11-27T20:11:02.127Z",
       "skills": {
         "hh-dedupe": {
-          "integrity": "sha256-06cb74b03a17453775d41223787c90ebe841e2469186703803488b64c2e46029"
+          "integrity": "sha256-2713533664e7e0f6bca5730c06c707c5137300d7c28f4934bd5719b7b9e78215"
         },
         "hh-drift": {
-          "integrity": "sha256-c29dbc770ed1e7899e6644e091e2264763dc721dcdb8366c64272d8d092b750b"
+          "integrity": "sha256-bf7e4ed8c04a92a37c42171038b19e39de99f2495bac389963d94966a9132e34"
+        },
+        "hh-push-down": {
+          "integrity": "sha256-2e98a8b9a892f4b7fddb4b0f8e77f7ac7cb8cc132730a6141814c25a12f3d280"
         },
         "hh-wrap": {
-          "integrity": "sha256-cf9fbc1d3717d96f8b7f6b7dcab8802cfea2a914d1c06eda2a41a2f35f00de58"
+          "integrity": "sha256-035ab428467ae2bb2b99d5247e49e1a1a85c1b6dabf76842f895d24fa002593c"
         }
       },
       "skillSelection": [
         "hh-dedupe",
         "hh-drift",
+        "hh-push-down",
         "hh-wrap"
       ],
       "skillsPath": "skills",
       "rules": {
         "diary": {
-          "integrity": "sha256-900c15e2a8d0acba784d3fa19f675f6e699fa6ed17fc77a71b9e62cb228e2686"
+          "integrity": "sha256-33d612150ea6ec48d793e511e0131742a43bcbe5bbfcdddf56918a1bf423f25a"
         },
         "glossary": {
-          "integrity": "sha256-1e7f1fde16a1675bc735681478d32948058a67f8c90b99463394740e218a90c1"
+          "integrity": "sha256-eff6bde595a3c3cdd8cd684beaaa8b568c70bcf4f43079a197ea1de94bf80979"
         },
         "principles": {
-          "integrity": "sha256-354b8bae1e20714242227e9eb657685a0cf587a4957c5477119ceafa0f14e6aa"
+          "integrity": "sha256-20b2431437c8c8f7d7cafd2e7e64aabad1083fa9415b4308b056f1a0d7141ca6"
+        },
+        "rule-load-test": {
+          "integrity": "sha256-3f7e65befe053dd9e8c46dcafdc631e04d04851cb9f5f7ec76477507b0affd38"
         },
         "sandbox": {
           "integrity": "sha256-2badd4ac9e15f4f14d4ad60c45a9aac88c4283350fb5f4e6cfcdd47498d71eeb"
@@ -43,6 +50,7 @@
         "diary",
         "glossary",
         "principles",
+        "rule-load-test",
         "sandbox",
         "zsh"
       ],
@@ -51,6 +59,7 @@
         "diary",
         "glossary",
         "principles",
+        "rule-load-test",
         "sandbox",
         "zsh"
       ]
@@ -58,7 +67,7 @@
     "kucherenko/jscpd": {
       "requestedRef": "v5.4.1",
       "resolvedRef": "095d6ca33e9f291c144bb05ef653b2bfdc3c1453",
-      "resolvedAt": "2026-11-23T00:57:04.038Z",
+      "resolvedAt": "2026-11-27T20:11:02.894Z",
       "skills": {
         "dry-refactoring": {
           "integrity": "sha256-74527e92b67366feb4add0c167c502d5d8d0c405a784daf4e24c4f7d73fda119"

@@ -124,6 +124,15 @@ How Claude and the operator work together on this project.
   this project, such as one about another project, is not written into the plan,
   the docs or the diary as a task, a goal or a lean (diary decision 2026-11-07:
   other projects stay out).
+- A session writes its temporary files in its own scratchpad, the folder Claude
+  Code names for it, or, where none is named, under a name only it uses, such as
+  one `mktemp` makes. Where the named scratchpad cannot be written, the session
+  makes a folder with `mktemp -d` and uses it for the rest of the session.
+  `$TMPDIR` is one folder shared by every session on the machine, so a file at a
+  fixed name there may be another session's, and reading it into a commit, a
+  pull request or a message publishes that session's work (diary decision
+  2026-11-24: temporary files a session's own) (diary decision 2026-11-27: a
+  `mktemp -d` folder where the scratchpad cannot be written).
 - A request to another Claude that applies a rule quotes the rule and states its
   whole scope. A narrower list of cases in the request is read as the scope, and
   the cases it leaves out are missed (diary decision 2026-11-01: requests to
@@ -135,9 +144,9 @@ How Claude and the operator work together on this project.
 - A project never changes what hh-rules shares with it: a rule, skill, script or
   config. A change it wants goes to the hh-advise session, as a draft with what
   it rests on, when the project is connected to one, and otherwise as an issue
-  on hh-rules. The advisor reviews it, and a client session it starts in
-  hh-rules makes and commits the change (diary decision 2026-11-22: rules pack
-  skills).
+  on hh-rules. The hh-advise session reviews it, and a client session it starts
+  in hh-rules makes and commits the change (diary decision 2026-11-22: rules
+  pack skills).
 - Nothing of ours goes in `.claude/`, which Anthropic owns and changes, but what
   Claude Code reads only from there: the rules, the skills and `settings.json`.
   hh-rules' copies live in `.hh/shared/` and Claude's reference docs in
@@ -190,28 +199,10 @@ How Claude and the operator work together on this project.
   `.claude/rules/<project>-<topic>.md`, because rulesync overwrites a file named
   like a shared rule it installs. `CLAUDE.md` names them, so a session can read
   one when working on its subject without touching the files it covers. A new
-  one is tested once in a fresh session: read a file it covers, without opening
-  the rule, and check that the rule loads. A wrong path makes it fail silently.
-  The session that wrote the rule runs the test itself, with a headless
-  `claude -p` in the project's folder, given the Read tool and no other with
-  `--tools Read`, and told to read one file the rule covers. The run is given an
-  `InstructionsLoaded` hook in `--settings`, which logs each rule file as it
-  loads, with `<log>` a file outside the project, so nothing in the project
-  changes. It is started outside the sandbox, inside which a headless session
-  cannot sign in:
-
-  ```shell
-  claude -p "Read <file> with the Read tool and reply done." \
-    --tools Read --settings '{"hooks":{"InstructionsLoaded":[{"hooks":
-    [{"type":"command","command":"jq -c . >> <log>"}]}]}}'
-  ```
-
-  The test counts only where the run exits 0, since a run that fails still logs
-  the rules loaded at its start. It passes when the log holds the new rule with
-  the `load_reason` `path_glob_match` and the file read as its
-  `trigger_file_path`, and holds no rule written for other files. The log is the
-  evidence, not the headless session's account of what loaded (diary decision
-  2026-11-21: the rule-load test read from a hook's log).
+  one is tested once, as the `rule-load-test` rule says, which loads when a file
+  under `.claude/rules/` is read, written or edited (diary decision 2026-11-24:
+  the push-down's moves on hh-rules, those that leave the start and those turned
+  down).
 
 - The README is the human interface to the project: what it is and how to use
   it, kept short. It is not a home for Claude's docs (diary decision 2026-10-31:
@@ -223,7 +214,12 @@ How Claude and the operator work together on this project.
   conversation, and stay correct until that work is done (diary decision
   2026-10-31: plan, diary and docs). Like code comments, they describe what is,
   not how it got that way: no history, dates, or counts that go stale. A reason
-  stays only where it prevents a future edit, as in "X is not done because Y".
+  stays only where it prevents a future edit, as in "X is not done because Y". A
+  reference file under `.hh/docs/` on outside work, such as a study of another
+  project or a survey of tools, keeps the dates, counts and versions it read,
+  each pinned to the version or commit it was read at, since a figure about one
+  version does not go stale and the file's findings rest on it (diary decision
+  2026-11-24: dated figures kept in a reference file on outside work).
 
 - The plan holds how the operator wants the system to change. Anything agreed
   that is not being done right now goes into the plan before the conversation
@@ -232,12 +228,15 @@ How Claude and the operator work together on this project.
   operator agrees it matches what was agreed. The one exception is `/hh-wrap`,
   which adds lines for its findings, the session's loose ends and each new copy
   of code, without asking, because it runs as the operator is leaving (diary
-  decision 2026-11-04: docs, the plan and the wrap's own lines) (diary decision
-  2026-11-22: wrap fixes procedure and plans the rest, a client's findings on
-  other tasks reported); it also removes an item finished in every part and
-  moves a built provisional decision into the diary, so the operator can stop
-  after a wrap with nothing settled lost (diary decision 2026-11-13: provisional
-  decisions in the plan, and what the wrap fixes there).
+  decision 2026-11-04: docs, the plan and the wrap's own lines); where the
+  hh-advise session answers for the operator, it decides each of those instead,
+  and the wrap makes the fix or writes the plan task its answer calls for,
+  leaving a line only for what stays the operator's (diary decision 2026-11-23:
+  the wrap resolves its findings where hh-advise can answer); it also removes an
+  item finished in every part and moves a built provisional decision into the
+  diary, so the operator can stop after a wrap with nothing settled lost (diary
+  decision 2026-11-13: provisional decisions in the plan, and what the wrap
+  fixes there).
 
 - The plan is `PLAN.md` at the project root: one list of tasks in the order they
   are to be done, the next first, each a bullet led by its short name in bold. A
@@ -328,11 +327,21 @@ How Claude and the operator work together on this project.
   discussion, never refused at commit, since a refused skip leaves weakening the
   test as the cheapest way past. The wrap finds them by the test runner's own
   count, which `hh-metrics` records, and each rules pack says how its runner
-  counts and lists them (diary decision 2026-11-22: tests set aside counted by
-  the test runner, each raised once).
+  counts and lists them (diary decision 2026-11-24: tests set aside counted by
+  the test runner, each listed by name). In a wrap the hh-advise session answers
+  for while it supervises, the discussion is with hh-advise, whose answer stands
+  for the operator's (diary decision 2026-11-23: the wrap resolves its findings
+  where hh-advise can answer).
 - A test or check is never weakened to make it pass without the operator's
   agreement: no loosened assertion, raised timeout, retry, `|| true`, ignored
   exit status or swallowed error.
+- A test's expected value comes from outside the code under test: worked out by
+  hand or in closed form, read from a source such as a specification or the
+  document the code reads, or computed by another program. Where no such source
+  exists and the value is taken from the code's own output, as for a golden
+  file, the report says so and names what was checked of the value. A changed
+  expected value comes with why the old one was wrong (diary decision
+  2026-11-24: a test's expected value from outside the code under test).
 - Code is never removed, stubbed or disabled to make a test pass. When working
   code and a test disagree, that is a finding to report.
 - A failing test is a real failure until shown otherwise. Calling it
@@ -349,10 +358,16 @@ How Claude and the operator work together on this project.
   and that it failed. Two cases are said as what they are: a test that fails
   there only because it imports what the change added, and a refactoring's
   tests, which pass on the old code. Where the work is reviewed from the
-  session's transcript, as a client's is by the advisor, the run's real output
-  there is what the review reads (diary decision 2026-11-22: a new test's
-  failing run named in the report and read in the transcript).
+  session's transcript, as a client's is by the hh-advise session, the run's
+  real output there is what the review reads (diary decision 2026-11-22: a new
+  test's failing run named in the report and read in the transcript).
 - Match test depth to the cost of a wrong answer.
+- A change to a script whose failure would show at its first use, such as a new
+  name for a command or a changed option, is checked by running it, with the run
+  shown in the report. It gets no new test suite, test tool or commit hook. A
+  script gets automated tests where a wrong answer would go unseen or cost more
+  than a rerun, such as one whose output a review or another script relies on
+  (diary decision 2026-11-24: script tests matched to the change).
 - Test code is held to the standard of the code it tests: the same type checks
   and lint rules, with exceptions only where a test truly differs, such as
   pytest's plain `assert`, and repeated setup factored into shared helpers
@@ -373,7 +388,9 @@ How Claude and the operator work together on this project.
   operator as numbers. They are never held to a threshold. Nothing is excluded
   from what they measure except with the operator's agreement, in the tool's
   config, with the reason beside it. What to do about a number is decided with
-  the operator.
+  the operator, or with the hh-advise session while it supervises, as for a
+  wrap's findings (diary decision 2026-11-23: the wrap resolves its findings
+  where hh-advise can answer).
 
 ## Debugging
 
@@ -418,18 +435,34 @@ How Claude and the operator work together on this project.
 - Local commits are free.
 - A session working in a git worktree of the project, as a background session
   does, sets the worktree up before its first change, since a worktree holds
-  only tracked files. It installs the dependencies its rules packs name. It
-  brings in the ignored files its work reads: Claude Code copies into a new
-  worktree the ignored files that a `.worktreeinclude` file at the project's
-  root lists, which the project commits, but no symbolic link, so a link is
-  copied from the checkout, the first folder `git worktree list` prints, with
-  `cp -P` (diary decision 2026-11-20: a worktree set up before work).
+  only tracked files. It installs the dependencies its rules packs name, reading
+  each pack's rule in `.claude/rules/` by its path for them, since a pack's
+  scoped rule loads only once a file it covers is read (diary decision
+  2026-11-24: a pack's rule read by its path to set up a worktree). It brings in
+  the ignored files its work reads: Claude Code copies into a new worktree the
+  ignored files that a `.worktreeinclude` file at the project's root lists,
+  which the project commits, but no symbolic link, so a link is copied from the
+  checkout, the first folder `git worktree list` prints, with `cp -P` (diary
+  decision 2026-11-20: a worktree set up before work). An ignored file the work
+  changes reaches the checkout through no pull request, and Claude Code copies
+  nothing back. So before the session is ended, once its pull request is merged,
+  it brings the checkout's copy to its change, by the way the project's own
+  rules give where they give one, and by copying its whole file over the
+  checkout's where they give none; or, where its change was scratch or the
+  difference is not its own, it puts the checkout's copy back over its own. The
+  hh-advise session refuses to end a session whose ignored files that
+  `.worktreeinclude` lists differ from the checkout's (diary decision
+  2026-11-26: changed ignored files in a worktree refused before its session
+  ends).
 - A session that works on a branch of its own hands its finished work over as a
   pull request against the project's working branch, and never merges it: the
   operator merges it, or the hh-advise session while supervising. Its wrap
-  pushes that one branch, as below, and the session then opens the pull request
-  (diary decision 2026-11-21: a client's branches merged as pull requests by the
-  advisor).
+  pushes that one branch, as below, and once that push is made the session opens
+  the pull request; where the wrap pushed nothing, or the remote refused the
+  push, it opens none and reports why to whoever merges its work: the operator,
+  or the hh-advise session while it supervises (diary decision 2026-11-21: a
+  client's branches merged as pull requests by the advisor) (diary decision
+  2026-11-23: no pull request after a push not made).
 - A push needs the operator's go-ahead, and the wrap is one: `/hh-wrap`, once
   its commit is made, pushes the branch it wrapped to the same branch on the
   project's remote, and nothing else: no tag, no release and no forced push. A
@@ -461,13 +494,17 @@ How Claude and the operator work together on this project.
   `gh release download` onto the operator's own server, from which a tool that
   cannot log in, like Foundry, installs (diary decision 2026-11-21: publishing
   to a public repository).
-- A release needs the operator's go-ahead, as a push does, and supervising does
-  not extend to one. A session may say that work can't be tried until a release.
-  It asks about making one once, at the wrap, and does not list it among what is
-  waiting or raise it in other turns. The operator decides when a release is
-  made, after trying the work on a test server where the project has one. A task
-  never includes a release unless the operator asked for it (diary decision
-  2026-11-19: releases at the operator's go-ahead, asked once at the wrap).
+- A release is made only when the operator asks for one. No session asks about
+  making one, the wrap included; a session may say that work can't be tried
+  until a release, and lists no release as something waiting or asked for. The
+  operator decides when a release is made, after trying the work on a test
+  server where the project has one. A task never includes a release unless the
+  operator asked for it, and supervising alone does not extend to one. The
+  hh-advise session answers no to a client that asks about a release the
+  operator has not asked for, supervising or not, and passes nothing on; a
+  release the operator has asked for, or asked hh-advise to make, goes ahead as
+  asked (diary decision 2026-11-24: releases made only when the operator asks,
+  none asked about or awaited).
 - Pushed is published. Anything wrong in pushed commits is fixed by a new
   commit; rewriting pushed history does not remove it, because clones, forks and
   caches keep the old commits. A pushed secret is revoked or rotated at once,
