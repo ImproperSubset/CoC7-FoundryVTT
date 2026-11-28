@@ -130,9 +130,12 @@ How Claude and the operator work together on this project.
   makes a folder with `mktemp -d` and uses it for the rest of the session.
   `$TMPDIR` is one folder shared by every session on the machine, so a file at a
   fixed name there may be another session's, and reading it into a commit, a
-  pull request or a message publishes that session's work (diary decision
-  2026-11-24: temporary files a session's own) (diary decision 2026-11-27: a
-  `mktemp -d` folder where the scratchpad cannot be written).
+  pull request or a message publishes that session's work; a cache of downloaded
+  packages that runs share on purpose, holding nothing a session wrote and read
+  into none of those, may keep a fixed name there (diary decision 2026-11-24:
+  temporary files a session's own) (diary decision 2026-11-27: package caches at
+  fixed names in TMPDIR) (diary decision 2026-11-27: a `mktemp -d` folder where
+  the scratchpad cannot be written).
 - A request to another Claude that applies a rule quotes the rule and states its
   whole scope. A narrower list of cases in the request is read as the scope, and
   the cases it leaves out are missed (diary decision 2026-11-01: requests to

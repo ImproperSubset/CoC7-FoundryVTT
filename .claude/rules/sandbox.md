@@ -14,7 +14,7 @@ files explained).
   `routines`, `output-styles`, `settings.json`, `settings.local.json`,
   `launch.json`, `loop.md`, `scheduled_tasks.json`, `.cc-writes`. An empty file
   or character device at one of them is a placeholder, not a project file. Every
-  project has them, and they are empty files even at names that are normally
+  project has them, and they are placeholders even at names that are normally
   folders, such as `.vscode`.
 - Git does not show them where the operator's global git ignore file lists these
   paths. They still appear in a directory listing, a file search and

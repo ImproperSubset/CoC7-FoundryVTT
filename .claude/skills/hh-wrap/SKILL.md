@@ -246,7 +246,8 @@ section says.
   - something this session promised or owes, to the operator or another session;
   - a question the operator asked that has no answer, or a question put to the
     operator that has none;
-  - a finding from the operator, an advisor or a watcher that is not settled;
+  - a finding from the operator, an advisor or the advisor's review agent that
+    is not settled;
   - anything put off to a later commit, such as what the commit that builds a
     task must also write;
   - a general lesson learned in the session that belongs in a rules pack's skill
