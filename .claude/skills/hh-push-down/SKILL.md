@@ -30,14 +30,14 @@ What is judged and what only reported:
 
 - In a client project, the project's own `CLAUDE.md` files and its own rules in
   `.claude/rules/`, those whose names carry its prefix, are judged, and a move
-  the operator agrees is made here. The shared rules hh-rules installs are read
-  and reported on, never changed: a project never changes what hh-rules shares
-  with it, so a finding on one goes, once the operator agrees it, to hh-advise
-  as a draft, or as an issue on hh-rules where no hh-advise session is
-  connected, as the principles say. A subsystem's guidance in the project's own
+  the operator agrees is made here. A subsystem's guidance in the project's own
   files, which matters only to work on that code, is moved into a rule triggered
   by its directories or file names (diary decision 2026-11-24: the push-down
-  covers clients' own files, by rules triggered on patterns).
+  covers clients' own files, by rules triggered on patterns). The shared rules
+  hh-rules installs are listed with their sizes in step 1 and not judged: they
+  are audited once, in hh-rules before a tag, against hh-rules' decisions on
+  where each passage sits, which a client cannot read (diary decision
+  2026-11-27: the push-down in a client judges its own files only).
 - In hh-rules itself, its own `CLAUDE.md` and path-scoped rules, and every
   shared rule in `rules/`, the principles and every pack among them, are all
   judged. `.claude/rules/` links only some of them, so a rule in `rules/` it
@@ -68,16 +68,20 @@ loads with it. Give each its size in words, `wc -w` on the file, and the total.
 Then list the path-scoped rules in `.claude/rules/` that did not load, each with
 its `paths:` patterns and size, comparing the log's paths with each rule's
 target, which `realpath` gives for a link: they are read in step 2 too, for a
-passage wider than its own patterns. In hh-rules, list as well each rule in
-`rules/` that `.claude/rules/` does not link, with its `globs` and size, and
-mark those without `globs` as loaded at the start in every client that installs
-them; they are read in step 2 with the files loaded at the start.
+passage wider than its own patterns, in a client only those of the project's
+own. In hh-rules, list as well each rule in `rules/` that `.claude/rules/` does
+not link, with its `globs` and size, and mark those without `globs` as loaded at
+the start in every client that installs them; they are read in step 2 with the
+files loaded at the start.
 
 ## 2. Judge each passage's reach
 
 Read each file loaded at the start, passage by passage: a bullet, a paragraph,
-or a section where its parts stand or fall together. For each, say which work it
-applies to:
+or a section where its parts stand or fall together. In a client, read only the
+project's own `CLAUDE.md` files and its own rules, those whose names carry its
+prefix; the shared rules are listed in step 1 and not read here (diary decision
+2026-11-27: the push-down in a client judges its own files only). For each
+passage, say which work it applies to:
 
 - **All work**: whatever the session is doing, from its first turn, such as how
   to talk with the operator, how to settle a task, or what a claim needs behind
@@ -156,10 +160,10 @@ Lead with what was audited: the files loaded at the start with their sizes and
 total, from step 1. Then the findings, each a bullet labelled as the principles
 say for reply items, under a letter no earlier reply in the conversation has
 used: the file and the passage's first words, the judgment of step 2, the
-proposal of step 3 or the name of step 4, and the words it would move. Findings
-on shared rules in a client are grouped apart, as reports. Passages limited by a
-shared rule's fixed patterns are grouped apart too, each with that limit stated.
-End with the words that would leave the start if every finding were agreed.
+proposal of step 3 or the name of step 4, and the words it would move. Passages
+limited by a shared rule's fixed patterns are grouped apart, each with that
+limit stated. End with the words that would leave the start if every finding
+were agreed.
 
 Apply nothing without the operator's agreement, finding by finding. In hh-rules,
 the session running this skill makes no move itself: an agreed move is a task

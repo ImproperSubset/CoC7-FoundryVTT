@@ -2,9 +2,9 @@
   "lockfileVersion": 1,
   "sources": {
     "impropersubset/hh-rules": {
-      "requestedRef": "v0.31.0",
-      "resolvedRef": "b75fc85a0da35cadfb4fd1c8653e2ee5b66633d9",
-      "resolvedAt": "2026-11-27T20:11:02.127Z",
+      "requestedRef": "v0.32.0",
+      "resolvedRef": "15600864f8c4d6241a7be1b3d87582ecd1ff00b4",
+      "resolvedAt": "2026-11-28T01:10:35.788Z",
       "skills": {
         "hh-dedupe": {
           "integrity": "sha256-2713533664e7e0f6bca5730c06c707c5137300d7c28f4934bd5719b7b9e78215"
@@ -13,10 +13,10 @@
           "integrity": "sha256-bf7e4ed8c04a92a37c42171038b19e39de99f2495bac389963d94966a9132e34"
         },
         "hh-push-down": {
-          "integrity": "sha256-2e98a8b9a892f4b7fddb4b0f8e77f7ac7cb8cc132730a6141814c25a12f3d280"
+          "integrity": "sha256-9210576e815bd1d1626d18bd26d65c75aa54c697e78b0825c80e6f109d7eb0a8"
         },
         "hh-wrap": {
-          "integrity": "sha256-035ab428467ae2bb2b99d5247e49e1a1a85c1b6dabf76842f895d24fa002593c"
+          "integrity": "sha256-e71d7151e2e91269f4692a53f49097a1749ebebb6ab79d5f4f5ca957058690e9"
         }
       },
       "skillSelection": [
@@ -34,13 +34,13 @@
           "integrity": "sha256-eff6bde595a3c3cdd8cd684beaaa8b568c70bcf4f43079a197ea1de94bf80979"
         },
         "principles": {
-          "integrity": "sha256-20b2431437c8c8f7d7cafd2e7e64aabad1083fa9415b4308b056f1a0d7141ca6"
+          "integrity": "sha256-690303843b30fb0fd1b9be2fb41691756a28289769a222a54bd503c800c9a9dc"
         },
         "rule-load-test": {
           "integrity": "sha256-3f7e65befe053dd9e8c46dcafdc631e04d04851cb9f5f7ec76477507b0affd38"
         },
         "sandbox": {
-          "integrity": "sha256-2badd4ac9e15f4f14d4ad60c45a9aac88c4283350fb5f4e6cfcdd47498d71eeb"
+          "integrity": "sha256-21d2f27c90bf3475b33f791ce4d15365b169ed3370dbcd12e3d869bd8d100e4b"
         },
         "zsh": {
           "integrity": "sha256-05dd64b8db695fe62ff1e6d54e2556dfb8be24503f15db2f718b1e776916e265"
@@ -67,7 +67,7 @@
     "kucherenko/jscpd": {
       "requestedRef": "v5.4.1",
       "resolvedRef": "095d6ca33e9f291c144bb05ef653b2bfdc3c1453",
-      "resolvedAt": "2026-11-27T20:11:02.894Z",
+      "resolvedAt": "2026-11-28T01:10:36.509Z",
       "skills": {
         "dry-refactoring": {
           "integrity": "sha256-74527e92b67366feb4add0c167c502d5d8d0c405a784daf4e24c4f7d73fda119"
